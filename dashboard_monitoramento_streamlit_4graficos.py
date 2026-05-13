@@ -728,14 +728,25 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     def cor(status):
         return "#21D07A" if status == "ON" else "#FF4D5E"
 
+    def item(status, label):
+        return f"""
+            <div style="font-size:13px; font-weight:800; line-height:1.55; margin-bottom:8px; white-space:nowrap;">
+                {bolinha(status)} <span style="color:{cor(status)}; font-weight:900;">{status}</span> {label}
+            </div>
+        """
+
     html = f"""
     <div class="kpi-card">
         <div class="kpi-label">Robôs</div>
-        <div style="margin-top:10px; font-size:14px; font-weight:800;">
-            {bolinha(status_0km)} <span style="color:{cor(status_0km)};">{status_0km}</span> 0KM<br><br>
-            {bolinha(status_t2)} <span style="color:{cor(status_t2)};">{status_t2}</span> Transferência 2<br><br>
-            {bolinha(status_t3)} <span style="color:{cor(status_t3)};">{status_t3}</span> Transferência 3<br><br>
-            {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)};">{status_monitoramento}</span> Monitoramento
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:10px; align-items:start;">
+            <div>
+                {item(status_t2, "Transf. 2")}
+                {item(status_t3, "Transf. 3")}
+            </div>
+            <div>
+                {item(status_0km, "0KM")}
+                {item(status_monitoramento, "Monitoramento")}
+            </div>
         </div>
     </div>
     """
@@ -747,10 +758,14 @@ def fig_layout(fig, height=360):
     fig.update_layout(
         height=height,
         width=1600,
-        margin=dict(l=22, r=22, t=88, b=35),
+        margin=dict(l=22, r=22, t=130, b=35),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#EAF4FF", family="Arial"),
+        uniformtext=dict(
+            mode="show",
+            minsize=9,
+        ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -812,7 +827,7 @@ def line_chart(df, cols, title):
                 y=y_vals,
                 mode="lines+markers+text",
                 text=[fmt_num(v) for v in y_vals],
-                textposition="top center",
+                textposition="middle top",
                 textfont=dict(size=10, color=cor),
                 name=col,
                 line=dict(width=3, color=cor),
