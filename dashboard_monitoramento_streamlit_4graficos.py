@@ -785,36 +785,49 @@ def fig_layout(fig, height=360):
 
 def line_chart(df, cols, title):
     fig = go.Figure()
-    colors = ["#F6C343", "#21D07A", "#FF4D5E", "#33C7FF", "#8AB4FF"]
 
-    # 🔥 CONVERTE eixo X para índice numérico
+    # Converte eixo X para índice numérico e mantém o rótulo real do horário no hover/eixo.
     x_labels = df["Horário"].astype(str).tolist() if "Horário" in df.columns else [str(i) for i in df.index]
     x_vals = list(range(len(x_labels)))
 
-    for i, col in enumerate(cols):
-        if col in df.columns:
-            y_vals = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+    for col in cols:
+        if col not in df.columns:
+            continue
 
-            fig.add_trace(
-                go.Scatter(
-                    x=x_vals,
-                    y=y_vals,
-                    mode="lines+markers",
-                    name=col,
-                    line=dict(width=3, color=colors[i % len(colors)]),
-                    marker=dict(size=7),
+        y_vals = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
-                    customdata=x_labels,
-                    hovertemplate="%{customdata}<br>" + col + ": %{y}<extra></extra>",
-                )
+        nome_lower = col.lower()
+        if "sucesso" in nome_lower:
+            cor = "#21D07A"  # verde
+        elif "incons" in nome_lower:
+            cor = "#FF4D5E"  # vermelho
+        elif "fila" in nome_lower:
+            cor = "#F6C343"  # amarelo
+        else:
+            cor = "#33C7FF"
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="lines+markers+text",
+                text=[fmt_num(v) for v in y_vals],
+                textposition="top center",
+                textfont=dict(size=10, color=cor),
+                name=col,
+                line=dict(width=3, color=cor),
+                marker=dict(size=7, color=cor),
+                customdata=x_labels,
+                hovertemplate="%{customdata}<br>" + col + ": %{y}<extra></extra>",
             )
+        )
 
-    # 🔥 REDUZ LABELS (evita poluição)
+    # Reduz labels do eixo X para evitar poluição visual.
     passo = max(1, len(x_vals) // 20)
     tickvals = x_vals[::passo]
     ticktext = x_labels[::passo]
 
-    # 🔥 DEFINE JANELA INICIAL (últimos pontos)
+    # Define janela inicial com os últimos pontos.
     janela = 25
     inicio = max(0, len(x_vals) - janela)
     fim = max(1, len(x_vals) - 1)
@@ -824,7 +837,7 @@ def line_chart(df, cols, title):
         tickvals=tickvals,
         ticktext=ticktext,
         tickangle=-45,
-        range=[inicio, fim],  # ✅ AGORA FUNCIONA
+        range=[inicio, fim],
         rangeslider=dict(visible=True),
     )
 
