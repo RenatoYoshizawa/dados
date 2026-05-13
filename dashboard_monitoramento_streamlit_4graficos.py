@@ -728,24 +728,25 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     def cor(status):
         return "#21D07A" if status == "ON" else "#FF4D5E"
 
-    def item(status, label):
-        return f"""
-            <div style="font-size:13px; font-weight:800; line-height:1.55; margin-bottom:8px; white-space:nowrap;">
-                {bolinha(status)} <span style="color:{cor(status)}; font-weight:900;">{status}</span> {label}
-            </div>
-        """
-
     html = f"""
     <div class="kpi-card">
         <div class="kpi-label">Robôs</div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:10px; align-items:start;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:10px; align-items:start;">
             <div>
-                {item(status_t2, "Transf. 2")}
-                {item(status_t3, "Transf. 3")}
+                <div style="font-size:13px; font-weight:800; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
+                    {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:900;">{status_t2}</span> Transferência 2
+                </div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; white-space:nowrap;">
+                    {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:900;">{status_t3}</span> Transferência 3
+                </div>
             </div>
             <div>
-                {item(status_0km, "0KM")}
-                {item(status_monitoramento, "Monitoramento")}
+                <div style="font-size:13px; font-weight:800; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
+                    {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:900;">{status_0km}</span> 0KM
+                </div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; white-space:nowrap;">
+                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:900;">{status_monitoramento}</span> Monitoramento
+                </div>
             </div>
         </div>
     </div>
@@ -753,19 +754,14 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
 
     st.markdown(html, unsafe_allow_html=True)
 
-
 def fig_layout(fig, height=360):
     fig.update_layout(
         height=height,
         width=1600,
-        margin=dict(l=22, r=22, t=130, b=35),
+        margin=dict(l=22, r=22, t=140, b=35),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#EAF4FF", family="Arial"),
-        uniformtext=dict(
-            mode="show",
-            minsize=9,
-        ),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -801,7 +797,6 @@ def fig_layout(fig, height=360):
 def line_chart(df, cols, title):
     fig = go.Figure()
 
-    # Converte eixo X para índice numérico e mantém o rótulo real do horário no hover/eixo.
     x_labels = df["Horário"].astype(str).tolist() if "Horário" in df.columns else [str(i) for i in df.index]
     x_vals = list(range(len(x_labels)))
 
@@ -813,11 +808,11 @@ def line_chart(df, cols, title):
 
         nome_lower = col.lower()
         if "sucesso" in nome_lower:
-            cor = "#21D07A"  # verde
+            cor = "#21D07A"
         elif "incons" in nome_lower:
-            cor = "#FF4D5E"  # vermelho
+            cor = "#FF4D5E"
         elif "fila" in nome_lower:
-            cor = "#F6C343"  # amarelo
+            cor = "#F6C343"
         else:
             cor = "#33C7FF"
 
@@ -827,7 +822,7 @@ def line_chart(df, cols, title):
                 y=y_vals,
                 mode="lines+markers+text",
                 text=[fmt_num(v) for v in y_vals],
-                textposition="middle top",
+                textposition="top center",
                 textfont=dict(size=10, color=cor),
                 name=col,
                 line=dict(width=3, color=cor),
@@ -837,12 +832,10 @@ def line_chart(df, cols, title):
             )
         )
 
-    # Reduz labels do eixo X para evitar poluição visual.
     passo = max(1, len(x_vals) // 20)
     tickvals = x_vals[::passo]
     ticktext = x_labels[::passo]
 
-    # Define janela inicial com os últimos pontos.
     janela = 25
     inicio = max(0, len(x_vals) - janela)
     fim = max(1, len(x_vals) - 1)
