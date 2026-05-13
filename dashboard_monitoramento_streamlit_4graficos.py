@@ -745,7 +745,7 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
                     {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:900;">{status_0km}</span> 0KM
                 </div>
                 <div style="font-size:13px; font-weight:800; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:900;">{status_monitoramento}</span> Monitoramento
+                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:900;">{status_monitoramento}</span> e-CRV
                 </div>
             </div>
         </div>
@@ -758,7 +758,7 @@ def fig_layout(fig, height=360):
     fig.update_layout(
         height=height,
         width=1600,
-        margin=dict(l=22, r=22, t=140, b=35),
+        margin=dict(l=22, r=22, t=170, b=35),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#EAF4FF", family="Arial"),
@@ -829,6 +829,7 @@ def line_chart(df, cols, title):
                 marker=dict(size=7, color=cor),
                 customdata=x_labels,
                 hovertemplate="%{customdata}<br>" + col + ": %{y}<extra></extra>",
+                cliponaxis=False,
             )
         )
 
@@ -848,6 +849,20 @@ def line_chart(df, cols, title):
         range=[inicio, fim],
         rangeslider=dict(visible=True),
     )
+
+    # Reserva espaço no eixo Y para os rótulos acima dos pontos,
+    # evitando corte dos valores mais altos.
+    y_max = 0
+    for col in cols:
+        if col in df.columns:
+            serie = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            if not serie.empty:
+                y_max = max(y_max, float(serie.max()))
+
+    if y_max > 0:
+        fig.update_yaxes(range=[0, y_max * 1.28])
+    else:
+        fig.update_yaxes(range=[0, 1])
 
     fig.update_layout(
         title=dict(
