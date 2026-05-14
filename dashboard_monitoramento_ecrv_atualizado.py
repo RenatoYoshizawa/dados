@@ -1,0 +1,1477 @@
+import os
+import time
+import base64
+import json
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import requests
+import plotly.graph_objects as go
+import streamlit as st
+import streamlit.components.v1 as components
+
+
+# =========================#
+# CONFIGURAÇÕES
+# =========================
+
+# Repositório GitHub utilizado pelo RPA de monitoramento.
+# Para repositório privado, cadastre TOKEN_GITHUB em: Streamlit Cloud > Settings > Secrets.
+GITHUB_OWNER = "RenatoYoshizawa"
+GITHUB_REPO = "Monitoramento"
+GITHUB_BRANCH = "main"
+
+GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
+GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
+GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
+
+CACHE_DIR = Path("/tmp/monitoramento_ecrv_cache")
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+ARQ_LOCAL_MONITORAMENTO = CACHE_DIR / "Monitoramento.xlsx"
+ARQ_LOCAL_CRITICAS = CACHE_DIR / "Criticas.xlsx"
+ARQ_LOCAL_HISTORICO = CACHE_DIR / "Historico_Criticas.xlsx"
+META_LOCAL = CACHE_DIR / "github_meta.json"
+
+INTERVALO_VERIFICACAO_SEGUNDOS = 10
+
+
+# =========================
+# STREAMLIT
+# =========================
+
+st.set_page_config(
+    page_title="Monitoramento e-CRV",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+
+# =========================
+# CSS
+# =========================
+
+CSS = """
+<style>
+:root {
+    --bg: #061529;
+    --panel: #0A2344;
+    --panel2: #0E315F;
+    --blue: #0B5ED7;
+    --cyan: #33C7FF;
+    --text: #EAF4FF;
+    --muted: #9DB7D2;
+    --green: #21D07A;
+    --yellow: #F6C343;
+    --red: #FF4D5E;
+    --white: #FFFFFF;
+    --border: rgba(91, 166, 255, 0.22);
+}
+
+.stApp {
+    background: radial-gradient(circle at top left, #0B3D91 0%, #061529 28%, #030A14 100%);
+    color: var(--text);
+}
+
+[data-testid="stHeader"] { background: rgba(0,0,0,0); }
+[data-testid="stToolbar"] { display: none; }
+
+.block-container {
+    padding-top: 1.3rem;
+    padding-bottom: 1rem;
+    max-width: 100%;
+}
+
+.hive-title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: .5px;
+    color: #EAF4FF;
+    margin-bottom: 0px;
+}
+
+.hive-subtitle {
+    color: #9DB7D2;
+    font-size: 13px;
+    margin-top: 2px;
+    margin-bottom: 18px;
+}
+
+.kpi-card {
+    background: linear-gradient(160deg, rgba(14,49,95,.96), rgba(7,25,49,.96));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 16px 14px 16px;
+    min-height: 142px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .28);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.kpi-label {
+    color: #9DB7D2;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    min-height: 34px;
+}
+
+.kpi-value {
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1.08;
+    margin-top: 8px;
+    white-space: nowrap;
+}
+
+.kpi-note {
+    color: #9DB7D2;
+    font-size: 11px;
+    margin-top: 9px;
+}
+
+.panel {
+    background: rgba(7, 25, 49, .92);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 18px 12px 18px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .24);
+    margin-bottom: 18px;
+}
+
+.panel-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #EAF4FF;
+    margin-bottom: 10px;
+    letter-spacing: .3px;
+}
+
+.robot-line {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #EAF4FF;
+}
+
+.robot-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    min-width: 12px;
+    border-radius: 50%;
+}
+
+.robot-dot.on {
+    background: #21D07A;
+    box-shadow: 0 0 10px rgba(33, 208, 122, .9);
+}
+
+.robot-dot.off {
+    background: #FF4D5E;
+    box-shadow: 0 0 10px rgba(255, 77, 94, .9);
+}
+
+.robot-status {
+    font-size: 12px;
+    font-weight: 900;
+    min-width: 28px;
+}
+
+.robot-status.on {
+    color: #21D07A;
+}
+
+.robot-status.off {
+    color: #FF4D5E;
+}
+
+.footer-note {
+    color: #9DB7D2;
+    font-size: 12px;
+    text-align: right;
+}
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(7, 25, 49, .96);
+}
+
+/* fundo geral */
+div[data-testid="stDataFrame"] > div {
+    background: rgba(7, 25, 49, .96) !important;
+}
+
+/* tabela */
+div[data-testid="stDataFrame"] [role="table"] {
+    background: rgba(7, 25, 49, .96) !important;
+    color: #EAF4FF !important;
+}
+
+/* cabeçalho */
+div[data-testid="stDataFrame"] [role="columnheader"] {
+    background: #0E315F !important;
+    color: #EAF4FF !important;
+    font-weight: 800 !important;
+    border-bottom: 1px solid rgba(91, 166, 255, 0.25) !important;
+}
+
+/* células */
+div[data-testid="stDataFrame"] [role="gridcell"] {
+    background: rgba(7, 25, 49, .96) !important;
+    color: #EAF4FF !important;
+    border-color: rgba(91, 166, 255, 0.10) !important;
+}
+
+/* linhas alternadas */
+div[data-testid="stDataFrame"] [role="row"]:nth-child(even) [role="gridcell"] {
+    background: rgba(10, 35, 68, .96) !important;
+}
+
+/* fundo interno real do dataframe */
+div[data-testid="stDataFrame"] .glideDataEditor {
+    background: rgba(7, 25, 49, .96) !important;
+}
+
+/* viewport */
+div[data-testid="stDataFrame"] .dvn-scroller {
+    background: rgba(7, 25, 49, .96) !important;
+}
+
+/* células */
+div[data-testid="stDataFrame"] .gdg-cell {
+    background: rgba(7, 25, 49, .96) !important;
+    color: #EAF4FF !important;
+}
+
+/* header */
+div[data-testid="stDataFrame"] .gdg-header {
+    background: #0E315F !important;
+    color: #EAF4FF !important;
+}
+
+/* linhas alternadas */
+div[data-testid="stDataFrame"] .gdg-row:nth-child(even) .gdg-cell {
+    background: rgba(10, 35, 68, .96) !important;
+}
+
+/* aumenta o respiro entre colunas de cards */
+[data-testid="column"] {
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+}
+
+.chart-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+.chart-inner {
+    min-width: 1600px;
+}
+
+</style>
+"""
+st.markdown(CSS, unsafe_allow_html=True)
+
+
+# =========================
+# GITHUB / CACHE LOCAL
+# =========================
+
+def obter_token_github() -> str:
+    try:
+        token = st.secrets.get("TOKEN_GITHUB", "")
+        if token:
+            return str(token).strip()
+    except Exception:
+        pass
+    return os.getenv("TOKEN_GITHUB", "").strip()
+
+
+
+def github_headers():
+    token = obter_token_github()
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "monitoramento-ecrv-streamlit",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def carregar_meta_cache() -> dict:
+    try:
+        if META_LOCAL.exists():
+            return json.loads(META_LOCAL.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def salvar_meta_cache(meta: dict):
+    try:
+        META_LOCAL.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigatorio: bool = False):
+    """
+    Consulta o GitHub pela API Contents.
+    Se o SHA do arquivo não mudou, usa o arquivo local em cache.
+    Se mudou, baixa o novo arquivo e atualiza o cache.
+    """
+    destino = Path(destino)
+    meta = carregar_meta_cache()
+    item_meta = meta.get(caminho_repo, {})
+
+    api_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/contents/{caminho_repo}"
+    )
+
+    resp = requests.get(
+        api_url,
+        headers=github_headers(),
+        params={"ref": GITHUB_BRANCH},
+        timeout=30,
+    )
+
+    if resp.status_code == 404:
+        if obrigatorio:
+            raise FileNotFoundError(f"Arquivo não encontrado no GitHub: {caminho_repo}")
+        return None, {"status": "ausente", "path": caminho_repo}
+
+    resp.raise_for_status()
+    dados = resp.json()
+    sha_remoto = dados.get("sha") or ""
+
+    if destino.exists() and item_meta.get("sha") == sha_remoto:
+        return destino, {
+            "status": "cache",
+            "path": caminho_repo,
+            "sha": sha_remoto,
+            "downloaded_at": item_meta.get("downloaded_at", ""),
+        }
+
+    conteudo_b64 = dados.get("content", "")
+    encoding = dados.get("encoding", "")
+
+    if not conteudo_b64 or encoding != "base64":
+        raise RuntimeError(f"GitHub não retornou conteúdo base64 válido para {caminho_repo}")
+
+    conteudo = base64.b64decode(conteudo_b64)
+
+    tmp = destino.with_suffix(destino.suffix + ".tmp")
+    tmp.write_bytes(conteudo)
+    tmp.replace(destino)
+
+    downloaded_at = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    meta[caminho_repo] = {
+        "sha": sha_remoto,
+        "downloaded_at": downloaded_at,
+        "size": dados.get("size"),
+    }
+    salvar_meta_cache(meta)
+
+    return destino, {
+        "status": "baixado",
+        "path": caminho_repo,
+        "sha": sha_remoto,
+        "downloaded_at": downloaded_at,
+    }
+
+# =========================
+# FUNÇÕES AUXILIARES
+# =========================
+
+def fmt_num(valor):
+    try:
+        return f"{int(valor):,}".replace(",", ".")
+    except Exception:
+        return "0"
+
+
+def arquivo_mtime(path: Path):
+    if not path.exists():
+        return None
+    return os.path.getmtime(path)
+
+
+def normalizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
+
+def carregar_media_padrao() -> pd.DataFrame:
+    dados = [
+        ["06:50", 12.5, 149.5, 5.5, 4.5, 8, 0, 1],
+        ["07:00", 26.86, 187.29, 6.86, 7.29, 13.14, 0.43, 1.43],
+        ["07:10", 23.36, 223.73, 6.36, 12.55, 17.36, 0.27, 1.27],
+        ["07:20", 29.18, 294.18, 7.09, 13.09, 23, 0.55, 1.27],
+        ["07:30", 38.27, 372, 9.36, 17, 29.64, 1.64, 1.27],
+        ["07:40", 49.62, 460.62, 11.54, 23.15, 38.08, 0.85, 1.38],
+        ["07:50", 60.15, 556.69, 12.92, 18.69, 47.38, 3.38, 1.92],
+        ["08:00", 72, 646.21, 22.21, 31.07, 59.21, 4.79, 2.43],
+        ["08:10", 88.64, 756.43, 28, 41.64, 72.36, 5.93, 2.93],
+        ["08:20", 109.2, 867.27, 34.6, 61, 85.73, 9.6, 3.33],
+        ["08:30", 134.62, 1021.94, 60.12, 83.31, 102.56, 37.12, 4.75],
+        ["08:40", 165.94, 1193.69, 87, 101.38, 121.56, 20.44, 6.38],
+        ["08:50", 199.44, 1394.25, 104.62, 98.69, 139.38, 19.62, 6.69],
+        ["09:00", 238.69, 1569.94, 141.06, 134.25, 163.56, 25.75, 8.25],
+        ["09:10", 297.75, 1795, 168.56, 125.75, 190.81, 10.06, 8.62],
+        ["09:20", 363.93, 2027.6, 182.8, 143.07, 215.13, 15.33, 9.07],
+        ["09:30", 434.93, 2231.79, 224, 169.13, 226.2, 38.47, 10.4],
+        ["09:40", 488.73, 2423.93, 251.2, 197.6, 270, 20.53, 13],
+        ["09:50", 550.2, 2623.13, 267.33, 246.67, 294.13, 27.73, 13.07],
+        ["10:00", 609.47, 2784.67, 314.53, 316.4, 320.47, 45.13, 13.47],
+        ["10:10", 695, 3008.93, 324.36, 351.07, 340.07, 23.07, 15.07],
+        ["10:20", 778.27, 3247.2, 366.07, 361.47, 377.4, 36.6, 14.67],
+        ["10:30", 880.4, 3567.71, 420.27, 378.27, 399.33, 44.93, 17.27],
+        ["10:40", 974.79, 3773.43, 465.21, 366.14, 441.21, 24.93, 18.64],
+        ["10:50", 1052.29, 4010.79, 470.77, 370.36, 474.21, 23.79, 19.21],
+        ["11:00", 1112.71, 4181.86, 546.93, 428.21, 500.07, 48.43, 20.36],
+        ["11:10", 1175, 4427.38, 589.46, 431.69, 529.85, 15, 22.38],
+        ["11:20", 1254.46, 4663, 604.62, 424.69, 562.15, 30.85, 22.31],
+        ["11:30", 1302.92, 4846.46, 643.31, 440.15, 604.38, 56.31, 23.62],
+        ["11:40", 1379.29, 5095.21, 694.43, 436.86, 642.86, 27.79, 23.86],
+        ["11:50", 1484.79, 5339.86, 710.21, 471.43, 681.64, 33.64, 21.07],
+        ["12:00", 1586.07, 5518.6, 777.67, 459.73, 704.67, 58.33, 23.6],
+        ["12:10", 1686.07, 5762.6, 828.2, 408.53, 737.47, 16.07, 24.07],
+        ["12:20", 1776, 5990.8, 843.8, 373.13, 776.13, 23.33, 24.87],
+        ["12:30", 1847.81, 6153.88, 890.06, 384.56, 800.94, 54.06, 25.88],
+        ["12:40", 1956.56, 6351.25, 934.81, 374.81, 834.19, 17.06, 26.81],
+        ["12:50", 2044, 6531.44, 945.38, 365.56, 863.69, 27, 26.81],
+        ["13:00", 2107.44, 6611.27, 969.6, 429.94, 826.38, 51.12, 26.31],
+        ["13:10", 2156, 6796.33, 1012.07, 443.6, 907.4, 21.47, 29.13],
+        ["13:20", 2249.94, 7034.31, 1046.06, 398.5, 942.5, 23.19, 29.12],
+        ["13:30", 2329.38, 7225.44, 1093.44, 370.5, 979.12, 40.06, 29.94],
+        ["13:40", 2396.75, 7417.25, 1128, 360.12, 1009.31, 17.19, 30.81],
+        ["13:50", 2485.94, 7620.62, 1142.44, 350.12, 1033.62, 29.31, 31.69],
+        ["14:00", 2540, 7639.38, 1165.79, 430.93, 1042.57, 53.5, 32.86],
+        ["14:10", 2790.93, 8092.43, 1207.79, 273.64, 1079.64, 30.93, 33.5],
+        ["14:20", 2864.4, 8302.67, 1251.73, 285.67, 1121.33, 37, 34],
+        ["14:30", 2958.8, 8506.8, 1299.6, 290.2, 1150.4, 65.13, 35.13],
+        ["14:40", 3047.93, 8726.2, 1347.07, 318.67, 1180.2, 29.67, 35.8],
+        ["14:50", 3062, 8824.81, 1355.62, 399.69, 1199.62, 35.81, 37.12],
+        ["15:00", 3142.56, 9028.62, 1414.31, 436.25, 1228, 52.38, 38.69],
+        ["15:10", 3224.43, 9205.29, 1444.79, 442.64, 1240.57, 17.71, 41.29],
+        ["15:20", 3296.07, 9337.77, 1487.93, 426.29, 1282.36, 27.07, 42.86],
+        ["15:30", 3442.81, 9807.94, 1550.88, 391.94, 1325.19, 52.12, 43.75],
+        ["15:40", 3558.88, 10072.33, 1603.12, 394.88, 1355.69, 16.81, 45.62],
+        ["15:50", 3676.62, 10334, 1629.19, 384.12, 1380.88, 34.5, 47.12],
+        ["16:00", 3808, 10578, 1698.67, 420.93, 1415.13, 65.8, 49.2],
+        ["16:10", 3926, 10783, 1778.47, 407.69, 1354.5, 26.12, 47.94],
+        ["16:20", 4055.2, 11148.87, 1870.87, 428.07, 1474.2, 212.53, 52.8],
+        ["16:30", 4236.8, 11451.93, 2003.13, 379.27, 1504.6, 558.4, 54.27],
+        ["16:40", 4381.4, 11725.53, 2144.8, 346, 1535, 448.2, 56.87],
+        ["16:50", 4556.25, 11989.94, 2273.94, 295.19, 1551.75, 395.75, 60.25],
+        ["17:00", 4684.06, 12175.14, 2384.88, 286.44, 1573.75, 444.62, 63.44],
+        ["17:10", 4844.5, 12417.44, 2509.81, 242.81, 1596.5, 344.81, 66.19],
+        ["17:20", 4980.38, 12640.2, 2638, 211.44, 1617.56, 285.19, 69.38],
+        ["17:30", 5108.12, 12803.19, 2765.81, 183.62, 1637.88, 316.12, 73.56],
+        ["17:40", 5226.06, 12968.81, 2882.19, 171, 1654.25, 218.88, 76.75],
+        ["17:50", 5344.06, 13112.81, 2975.38, 131.06, 1665.75, 187.62, 79.12],
+        ["18:00", 5423.5, 13226.56, 3070.69, 115.69, 1675.81, 201.94, 82.69],
+        ["18:10", 5487.12, 13340.81, 3169, 84.62, 1687.12, 115.56, 84.69],
+        ["18:20", 5545.86, 13541.07, 3202.93, 60.79, 1686.29, 83.43, 85.07],
+        ["18:30", 5591.87, 13579.07, 3300.2, 32, 1710.6, 72.13, 86.13],
+        ["18:40", 5583.93, 13556.53, 3333.4, 16.8, 1699.8, 34.87, 88.27],
+        ["18:50", 5641.06, 13645.93, 3354.88, 10.25, 1712.25, 24.75, 87.75],
+        ["19:00", 5661.6, 13727.27, 3389.33, 11.27, 1730.4, 40.87, 90.6],
+        ["19:10", 5677.47, 13755.33, 3411.07, 6.2, 1732.6, 25.6, 91.07],
+        ["19:20", 5690.2, 13785.13, 3426.67, 6.73, 1734.8, 17.33, 90.87],
+        ["19:30", 5730.36, 13865.64, 3452.36, 5.57, 1736.43, 12.07, 88.64],
+        ["19:40", 5767.08, 13946.25, 3427.33, 8.25, 1747, 5.67, 87.17],
+        ["19:50", 5760.38, 13918.69, 3409.15, 6.23, 1731.92, 7.08, 88.54],
+        ["20:00", 5771.38, 13938.92, 3420.31, 10.08, 1734.15, 8.15, 88.69],
+        ["20:10", 5784.46, 13967.77, 3424.38, 6.31, 1735.77, 1.92, 88.69],
+        ["20:20", 5799.23, 13995.85, 3428.15, 4.23, 1737.23, 10.69, 88.77],
+        ["20:30", 5809, 14045, 3426.75, 5.33, 1740.5, 1.42, 91.33],
+        ["20:40", 5818.83, 14066.67, 3428.08, 4.92, 1742.25, 1.17, 91.33],
+        ["20:50", 5833.25, 14085, 3431.33, 3.5, 1743.08, 4.42, 91.42],
+        ["21:00", 5842, 14098.25, 3440.25, 5.25, 1744, 1.5, 91.42],
+        ["21:10", 5884.45, 14184.64, 3488.09, 2.91, 1763.82, 0.55, 91.73],
+        ["21:20", 5866.17, 14129.17, 3443.08, 1.25, 1746.33, 1.5, 91.5],
+        ["21:30", 5878.75, 14234.82, 3435.09, 3.75, 1577.75, 0.33, 86],
+        ["21:40", 5890.36, 14248.36, 3435.91, 3.18, 1722.73, 0.27, 93.82],
+        ["21:50", 5886.88, 14326.25, 3451.62, 3.75, 1735.75, 0.12, 91.88],
+    ]
+
+    return pd.DataFrame(
+        dados,
+        columns=[
+            "Intervalo_10min",
+            "Automatizado",
+            "Sucesso 2 e 3",
+            "Sucesso 0km",
+            "Fila 2 e 3",
+            "Inconsistência 2 e 3",
+            "Fila 0km",
+            "Inconsistência 0km",
+        ],
+    )
+
+
+@st.cache_data(show_spinner=False)
+def carregar_excel(path_str: str, mtime: float):
+    df = pd.read_excel(path_str, engine="openpyxl")
+    df = normalizar_colunas(df)
+
+    if "Horário" in df.columns:
+        df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
+
+    for col in df.columns:
+        if col != "Horário":
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+    return df
+
+
+@st.cache_data(show_spinner=False)
+def carregar_excel_generico(path_str: str, mtime: float):
+    df = pd.read_excel(path_str, engine="openpyxl")
+    df = normalizar_colunas(df)
+    return df
+
+
+def media_coluna(df_media: pd.DataFrame, coluna: str):
+    if df_media is None or df_media.empty or coluna not in df_media.columns:
+        return None
+
+    s = pd.to_numeric(df_media[coluna], errors="coerce").dropna()
+    if s.empty:
+        return None
+
+    return float(s.mean())
+
+
+def cor_saude(valor: int, media, tipo: str):
+    """
+    tipo='positivo': sucesso e automatizado
+        verde: >= média
+        amarelo: até 20% abaixo
+        vermelho: abaixo de 20%
+
+    tipo='negativo': fila e inconsistência
+        verde: <= média
+        amarelo: até 20% acima
+        vermelho: acima de 20%
+    """
+    if media is None or media <= 0:
+        return "#FFFFFF"
+
+    valor = float(valor)
+
+    if tipo == "positivo":
+        if valor >= media:
+            return "#21D07A"
+        elif valor >= media * 0.80:
+            return "#F6C343"
+        else:
+            return "#FF4D5E"
+
+    if tipo == "negativo":
+        if valor <= media:
+            return "#21D07A"
+        elif valor <= media * 1.20:
+            return "#F6C343"
+        else:
+            return "#FF4D5E"
+
+    return "#FFFFFF"
+
+def cor_criticas_minuto(valor):
+    valor = int(valor or 0)
+
+    if valor == 0:
+        return "#21D07A"  # verde
+    elif 1 <= valor <= 5:
+        return "#F6C343"  # amarelo
+    else:
+        return "#FF4D5E"  # vermelho
+
+def obter_total_criticas_minuto(df_criticas: pd.DataFrame) -> int:
+    if df_criticas is None or df_criticas.empty:
+        return 0
+
+    if "Tipo Linha" in df_criticas.columns:
+        resumo = df_criticas[
+            df_criticas["Tipo Linha"].astype(str).str.upper().str.strip() == "RESUMO"
+        ]
+        if not resumo.empty and "Total críticas no minuto" in resumo.columns:
+            return int(pd.to_numeric(resumo.iloc[-1]["Total críticas no minuto"], errors="coerce") or 0)
+
+    if "Total críticas no minuto" in df_criticas.columns:
+        s = pd.to_numeric(df_criticas["Total críticas no minuto"], errors="coerce").dropna()
+        if not s.empty:
+            return int(s.iloc[-1])
+
+    return 0
+
+
+def _valor_sim(valor) -> bool:
+    return str(valor or "").strip().upper() == "SIM"
+
+
+def _to_int_safe(valor) -> int:
+    try:
+        if pd.isna(valor):
+            return 0
+    except Exception:
+        pass
+    try:
+        return int(float(str(valor).replace(".", "").replace(",", ".").strip()))
+    except Exception:
+        return 0
+
+
+def _coluna_existente(df: pd.DataFrame, alternativas: list[str]) -> str | None:
+    if df is None or df.empty:
+        return None
+    mapa = {str(c).strip().lower(): c for c in df.columns}
+    for alt in alternativas:
+        col = mapa.get(str(alt).strip().lower())
+        if col is not None:
+            return col
+    return None
+
+
+def _df_historico_full(df_hist: pd.DataFrame) -> pd.DataFrame:
+    """Retorna apenas as linhas do ciclo FULL de inconsistências por serviço."""
+    if df_hist is None or df_hist.empty:
+        return pd.DataFrame()
+
+    dfh = df_hist.copy()
+    col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
+    if col_tipo:
+        filtro = dfh[col_tipo].astype(str).str.upper().str.contains("INCONSIST", na=False)
+        filtro &= dfh[col_tipo].astype(str).str.upper().str.contains("FULL", na=False)
+        dfh = dfh[filtro].copy()
+
+    col_servico = _coluna_existente(dfh, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+    col_inc = _coluna_existente(dfh, ["Inconsistência", "Inconsistencia", "Descrição Inconsistência", "Descricao Inconsistencia"])
+    if not col_servico or not col_inc:
+        return pd.DataFrame()
+
+    return dfh
+
+
+def _df_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
+    dfh = _df_historico_full(df_hist)
+    if dfh.empty:
+        return pd.DataFrame()
+
+    col_data = _coluna_existente(dfh, ["Data/Hora", "Data Hora", "Data"])
+    if not col_data:
+        return dfh.tail(100).copy()
+
+    datas = dfh[col_data].dropna().astype(str)
+    if datas.empty:
+        return dfh.tail(100).copy()
+
+    ultima_data = datas.iloc[-1]
+    return dfh[dfh[col_data].astype(str) == ultima_data].copy()
+
+
+def _servico_para_chave(valor: str) -> str | None:
+    txt = str(valor or "").lower()
+    if "primeiro" in txt or "0km" in txt or "0 km" in txt or txt.strip() in {"1", "01"}:
+        return "0KM"
+    if "propriet" in txt or "transferência proprietário" in txt or "transferencia proprietario" in txt or txt.strip() in {"2", "02"}:
+        return "Transferência 2"
+    if "estado" in txt or "munic" in txt or "município" in txt or "transferência estado" in txt or "transferencia estado" in txt or txt.strip() in {"3", "03"}:
+        return "Transferência 3"
+    return None
+
+
+def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[str]:
+    """Identifica serviços com STOP SIM em Criticas.xlsx e/ou Historico_Criticas.xlsx."""
+    fontes = []
+    if df_criticas is not None and not df_criticas.empty:
+        fontes.append(df_criticas)
+    if df_hist is not None and not df_hist.empty:
+        fontes.append(df_hist)
+
+    servicos = set()
+    viu_stop = False
+
+    for df0 in fontes:
+        col_stop = _coluna_existente(df0, ["STOP PROCESSO ativado?"])
+        if not col_stop:
+            continue
+
+        linhas_stop = df0[df0[col_stop].apply(_valor_sim)].copy()
+        if linhas_stop.empty:
+            continue
+
+        viu_stop = True
+        col_desligados = _coluna_existente(linhas_stop, ["Serviços desligados", "Servicos desligados"])
+        col_servico = _coluna_existente(linhas_stop, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+
+        for _, row in linhas_stop.iterrows():
+            textos = []
+            if col_desligados:
+                textos.append(row.get(col_desligados, ""))
+            if col_servico:
+                textos.append(row.get(col_servico, ""))
+
+            combinado = " | ".join(str(x or "") for x in textos).strip()
+            if not combinado:
+                continue
+
+            for pedaco in combinado.replace("/", ",").replace(";", ",").split(","):
+                chave = _servico_para_chave(pedaco)
+                if chave:
+                    servicos.add(chave)
+
+            # Fallback por substring no texto completo.
+            for chave in ("0KM", "Transferência 2", "Transferência 3"):
+                if chave == "0KM" and ("primeiro" in combinado.lower() or "0km" in combinado.lower() or "1-" in combinado):
+                    servicos.add(chave)
+                if chave == "Transferência 2" and ("propriet" in combinado.lower() or "2-" in combinado):
+                    servicos.add(chave)
+                if chave == "Transferência 3" and ("estado" in combinado.lower() or "munic" in combinado.lower() or "3-" in combinado):
+                    servicos.add(chave)
+
+    # Se houve STOP SIM, mas não veio informação do serviço, assume cautelosamente todos OFF.
+    if viu_stop and not servicos:
+        servicos = {"0KM", "Transferência 2", "Transferência 3"}
+
+    return servicos
+
+
+def _houve_aumento_inconsistencia_servico(df_hist: pd.DataFrame, chave_servico: str) -> bool:
+    """Para voltar ON, verifica se a diferença do ciclo FULL aumentou no serviço."""
+    dfh = _df_historico_full_ultimo_ciclo(df_hist)
+    if dfh.empty:
+        return False
+
+    col_servico = _coluna_existente(dfh, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+    col_dif = _coluna_existente(dfh, ["Diferença ciclo", "Diferenca ciclo", "Diferença", "Diferenca"])
+    if not col_servico or not col_dif:
+        return False
+
+    tmp = dfh.copy()
+    tmp["_chave_servico"] = tmp[col_servico].apply(_servico_para_chave)
+    tmp = tmp[tmp["_chave_servico"] == chave_servico].copy()
+    if tmp.empty:
+        return False
+
+    dif = pd.to_numeric(tmp[col_dif], errors="coerce").fillna(0)
+    return bool((dif > 0).any())
+
+
+def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: pd.DataFrame = None):
+    """
+    Regra atual:
+    - OFF: quando houver STOP PROCESSO ativado = SIM para o respectivo serviço.
+    - ON novamente: quando houver aumento de inconsistências no ciclo FULL do próprio serviço.
+    """
+    status = {
+        "0KM": "ON",
+        "Transferência 2": "ON",
+        "Transferência 3": "ON",
+    }
+
+    for servico in _servicos_stop_sim(df_criticas, df_hist):
+        status[servico] = "OFF"
+
+    for servico in list(status.keys()):
+        if status[servico] == "OFF" and _houve_aumento_inconsistencia_servico(df_hist, servico):
+            status[servico] = "ON"
+
+    return status
+
+
+def render_card(label, value, color, note="Último registro"):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
+            <div class="kpi-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_robos_card(status_dict, robo_monitoramento_online=True):
+    status_0km = status_dict.get("0KM", "ON")
+    status_t2 = status_dict.get("Transferência 2", "ON")
+    status_t3 = status_dict.get("Transferência 3", "ON")
+    status_monitoramento = "ON" if robo_monitoramento_online else "OFF"
+
+    def bolinha(status):
+        return "🟢" if status == "ON" else "🔴"
+
+    def cor(status):
+        return "#21D07A" if status == "ON" else "#FF4D5E"
+
+    html = f"""
+    <div class="kpi-card">
+        <div class="kpi-label">Robôs</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:10px; align-items:start;">
+            <div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
+                    {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:900;">{status_t2}</span> Transferência 2
+                </div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; white-space:nowrap;">
+                    {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:900;">{status_t3}</span> Transferência 3
+                </div>
+            </div>
+            <div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
+                    {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:900;">{status_0km}</span> 0KM
+                </div>
+                <div style="font-size:13px; font-weight:800; line-height:1.45; white-space:nowrap;">
+                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:900;">{status_monitoramento}</span> e-CRV
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+
+    st.markdown(html, unsafe_allow_html=True)
+
+def fig_layout(fig, height=360):
+    fig.update_layout(
+        height=height,
+        width=1600,
+        margin=dict(l=22, r=22, t=170, b=35),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#EAF4FF", family="Arial"),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.06,
+            xanchor="left",
+            x=0,
+            font=dict(size=11, color="#9DB7D2"),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+
+        xaxis=dict(
+            gridcolor="rgba(157,183,210,.12)",
+            zerolinecolor="rgba(157,183,210,.12)",
+            tickfont=dict(color="#9DB7D2"),
+            tickangle=-45,
+
+            # 🔥 ESSENCIAL → ativa slider
+            rangeslider=dict(visible=True),
+
+            # 🔥 ESSENCIAL → define janela inicial (últimos pontos)
+            #range=[-30, 0],  # mostra só últimos 30 pontos
+        ),
+
+        yaxis=dict(
+            gridcolor="rgba(157,183,210,.12)",
+            zerolinecolor="rgba(157,183,210,.12)",
+            tickfont=dict(color="#9DB7D2"),
+        ),
+    )
+    return fig
+
+
+def line_chart(df, cols, title):
+    fig = go.Figure()
+
+    x_labels = df["Horário"].astype(str).tolist() if "Horário" in df.columns else [str(i) for i in df.index]
+    x_vals = list(range(len(x_labels)))
+
+    for col in cols:
+        if col not in df.columns:
+            continue
+
+        y_vals = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+        nome_lower = col.lower()
+        if "sucesso" in nome_lower:
+            cor = "#21D07A"
+        elif "incons" in nome_lower:
+            cor = "#FF4D5E"
+        elif "fila" in nome_lower:
+            cor = "#F6C343"
+        else:
+            cor = "#33C7FF"
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="lines+markers+text",
+                text=[fmt_num(v) for v in y_vals],
+                textposition="top center",
+                textfont=dict(size=10, color=cor),
+                name=col,
+                line=dict(width=3, color=cor),
+                marker=dict(size=7, color=cor),
+                customdata=x_labels,
+                hovertemplate="%{customdata}<br>" + col + ": %{y}<extra></extra>",
+                cliponaxis=False,
+            )
+        )
+
+    passo = max(1, len(x_vals) // 20)
+    tickvals = x_vals[::passo]
+    ticktext = x_labels[::passo]
+
+    janela = 25
+    inicio = max(0, len(x_vals) - janela)
+    fim = max(1, len(x_vals) - 1)
+
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=ticktext,
+        tickangle=-45,
+        range=[inicio, fim],
+        rangeslider=dict(visible=True),
+    )
+
+    # Reserva espaço no eixo Y para os rótulos acima dos pontos,
+    # evitando corte dos valores mais altos.
+    y_max = 0
+    for col in cols:
+        if col in df.columns:
+            serie = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            if not serie.empty:
+                y_max = max(y_max, float(serie.max()))
+
+    if y_max > 0:
+        fig.update_yaxes(range=[0, y_max * 1.28])
+    else:
+        fig.update_yaxes(range=[0, 1])
+
+    fig.update_layout(
+        title=dict(
+            text=title,
+            font=dict(size=16, color="#EAF4FF"),
+            y=0.98,
+            x=0.01,
+            xanchor="left",
+        )
+    )
+
+    return fig_layout(fig)
+
+def render_tabela_escura(df_tabela: pd.DataFrame):
+    html = df_tabela.to_html(index=False, escape=False)
+
+    html = html.replace(
+        '<table border="1" class="dataframe">',
+        '<table class="dark-table">'
+    )
+
+    st.markdown(
+        """
+        <style>
+        .dark-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(7, 25, 49, .96);
+            color: #EAF4FF;
+            font-size: 12px;
+        }
+
+        .dark-table thead th {
+            background: #0E315F;
+            color: #EAF4FF;
+            text-align: left;
+            padding: 9px;
+            font-weight: 800;
+            border-bottom: 1px solid rgba(91, 166, 255, 0.25);
+        }
+
+        .dark-table tbody td {
+            padding: 8px;
+            color: #EAF4FF;
+            border-bottom: 1px solid rgba(91, 166, 255, 0.10);
+            max-width: 520px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dark-table tbody tr:nth-child(even) {
+            background: rgba(10, 35, 68, .96);
+        }
+
+        .dark-table tbody tr:nth-child(odd) {
+            background: rgba(7, 25, 49, .96);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_mensagem_tabela(texto: str):
+    st.markdown(
+        f"""
+        <div style="
+            background: rgba(7, 25, 49, .96);
+            border: 1px solid rgba(91, 166, 255, 0.22);
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: #9DB7D2;
+            font-size: 13px;
+            font-weight: 700;
+        ">{texto}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
+    dfh = _df_historico_full_ultimo_ciclo(df_hist)
+    if dfh.empty:
+        return pd.DataFrame()
+
+    col_servico = _coluna_existente(dfh, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+    col_inc = _coluna_existente(dfh, ["Inconsistência", "Inconsistencia", "Descrição Inconsistência", "Descricao Inconsistencia"])
+    col_ant = _coluna_existente(dfh, ["Total ciclo anterior", "Total Ciclo Anterior"])
+    col_atual = _coluna_existente(dfh, ["Total ciclo atual", "Total Ciclo Atual"])
+    col_dif = _coluna_existente(dfh, ["Diferença ciclo", "Diferenca ciclo", "Diferença", "Diferenca"])
+    col_nova = _coluna_existente(dfh, [
+        "Inconsistência Não Mapeada?",
+        "Inconsistencia Nao Mapeada?",
+        "Nova na Base de Regras?",
+        "Inconsistência nova no ciclo?",
+        "Inconsistencia nova no ciclo?",
+    ])
+
+    if not col_servico or not col_inc:
+        return pd.DataFrame()
+
+    out = pd.DataFrame()
+    out["Serviço"] = dfh[col_servico].astype(str)
+    out["Descrição"] = dfh[col_inc].astype(str)
+    out["Total anterior"] = pd.to_numeric(dfh[col_ant], errors="coerce").fillna(0).astype(int) if col_ant else 0
+    out["Total ciclo atual"] = pd.to_numeric(dfh[col_atual], errors="coerce").fillna(0).astype(int) if col_atual else 0
+    out["Diferença"] = pd.to_numeric(dfh[col_dif], errors="coerce").fillna(0).astype(int) if col_dif else 0
+    out["Inconsistência desconhecida?"] = dfh[col_nova].astype(str).str.upper().str.strip().replace({"": "NÃO"}) if col_nova else "NÃO"
+    out["_chave_servico"] = out["Serviço"].apply(_servico_para_chave)
+    return out
+
+
+def tabela_top3_ciclo_atual(df_hist: pd.DataFrame) -> pd.DataFrame:
+    base = _preparar_historico_full_ultimo_ciclo(df_hist)
+    if base.empty:
+        return pd.DataFrame(columns=["Serviço", "Descrição", "Quantidade no ciclo"])
+
+    base = base[base["Diferença"] > 0].copy()
+    if base.empty:
+        return pd.DataFrame(columns=["Serviço", "Descrição", "Quantidade no ciclo"])
+
+    base = base.sort_values(["Diferença", "Total ciclo atual"], ascending=[False, False]).head(3)
+    return base[["Serviço", "Descrição", "Diferença"]].rename(columns={"Diferença": "Quantidade no ciclo"})
+
+
+def tabela_inconsistencias_desconhecidas(df_hist: pd.DataFrame) -> pd.DataFrame:
+    base = _preparar_historico_full_ultimo_ciclo(df_hist)
+    if base.empty:
+        return pd.DataFrame(columns=["Serviço", "Descrição", "Total ciclo atual", "Diferença"])
+
+    novas = base[base["Inconsistência desconhecida?"].astype(str).str.upper().str.strip().eq("SIM")].copy()
+    if novas.empty:
+        return pd.DataFrame(columns=["Serviço", "Descrição", "Total ciclo atual", "Diferença"])
+
+    novas = novas.sort_values(["Total ciclo atual", "Diferença"], ascending=[False, False])
+    return novas[["Serviço", "Descrição", "Total ciclo atual", "Diferença"]]
+
+
+def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.DataFrame:
+    base = _preparar_historico_full_ultimo_ciclo(df_hist)
+    if base.empty:
+        return pd.DataFrame(columns=["Descrição", "Total anterior", "Total ciclo atual", "Diferença"])
+
+    base = base[base["_chave_servico"] == chave_servico].copy()
+    if base.empty:
+        return pd.DataFrame(columns=["Descrição", "Total anterior", "Total ciclo atual", "Diferença"])
+
+    base = base.sort_values(["Total ciclo atual", "Diferença"], ascending=[False, False])
+    return base[["Descrição", "Total anterior", "Total ciclo atual", "Diferença"]]
+
+
+def tabela_historico_criticas_minuto(df_hist: pd.DataFrame) -> pd.DataFrame:
+    if df_hist is None or df_hist.empty:
+        return pd.DataFrame()
+
+    dfh = df_hist.copy()
+    col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
+    if col_tipo:
+        filtro = dfh[col_tipo].astype(str).str.upper().str.contains("CR", na=False)
+        filtro &= dfh[col_tipo].astype(str).str.upper().str.contains("MINUTO", na=False)
+        dfh = dfh[filtro].copy()
+
+    if dfh.empty:
+        return pd.DataFrame()
+
+    return dfh.tail(20).sort_index(ascending=False)
+
+# =========================
+# LEITURA DOS ARQUIVOS
+# =========================
+
+try:
+    caminho_monitor, meta_monitor = baixar_github_se_houver_alteracao(
+        GITHUB_ARQ_MONITORAMENTO,
+        ARQ_LOCAL_MONITORAMENTO,
+        obrigatorio=True,
+    )
+
+    df = pd.read_excel(caminho_monitor, engine="openpyxl")
+    df = normalizar_colunas(df)
+
+    if "Horário" in df.columns:
+        df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
+
+    for col in df.columns:
+        if col != "Horário":
+            df[col] = (
+                pd.to_numeric(df[col], errors="coerce")
+                .fillna(0)
+                .astype(int)
+            )
+
+except Exception as e:
+    st.error(f"Erro ao carregar o arquivo Monitoramento.xlsx do GitHub: {e}")
+    st.stop()
+
+if df.empty:
+    st.error("A planilha principal está vazia.")
+    st.stop()
+
+# Arquivos complementares. Não bloqueiam o painel se ainda não existirem no GitHub.
+df_media = carregar_media_padrao()
+
+df_criticas = None
+meta_criticas = {}
+try:
+    caminho_criticas, meta_criticas = baixar_github_se_houver_alteracao(
+        GITHUB_ARQ_CRITICAS,
+        ARQ_LOCAL_CRITICAS,
+        obrigatorio=False,
+    )
+    if caminho_criticas and Path(caminho_criticas).exists():
+        df_criticas = carregar_excel_generico(str(caminho_criticas), Path(caminho_criticas).stat().st_mtime)
+except Exception as e:
+    st.warning(f"Criticas.xlsx ainda não disponível ou não carregado: {e}")
+
+df_hist = None
+meta_historico = {}
+try:
+    caminho_hist, meta_historico = baixar_github_se_houver_alteracao(
+        GITHUB_ARQ_HISTORICO,
+        ARQ_LOCAL_HISTORICO,
+        obrigatorio=False,
+    )
+    if caminho_hist and Path(caminho_hist).exists():
+        df_hist = carregar_excel_generico(str(caminho_hist), Path(caminho_hist).stat().st_mtime)
+except Exception as e:
+    st.warning(f"Historico_Criticas.xlsx ainda não disponível ou não carregado: {e}")
+
+
+# =========================
+# DADOS PRINCIPAIS
+# =========================
+
+ultima = df.iloc[-1]
+hora_coleta = str(ultima["Horário"]) if "Horário" in df.columns else "-"
+ultima_modificacao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+# Considera o robô de monitoramento OFF quando o arquivo principal
+# fica mais de 15 minutos sem nova atualização no GitHub/cache.
+ultima_sync_github = meta_monitor.get("downloaded_at", "") if isinstance(meta_monitor, dict) else ""
+robo_monitoramento_online = True
+try:
+    if ultima_sync_github:
+        dt_sync = datetime.strptime(ultima_sync_github, "%d/%m/%Y %H:%M:%S")
+        minutos_sem_atualizacao = (datetime.now() - dt_sync).total_seconds() / 60
+        if minutos_sem_atualizacao > 15:
+            robo_monitoramento_online = False
+except Exception:
+    robo_monitoramento_online = False
+
+fila_trf = int(ultima.get("Fila 2 e 3", 0))
+sucesso_trf = int(ultima.get("Sucesso 2 e 3", 0))
+incons_trf = int(ultima.get("Inconsistência 2 e 3", 0))
+automatizado = int(ultima.get("Automatizado", 0))
+
+fila_0km = int(ultima.get("Fila 0km", 0))
+sucesso_0km = int(ultima.get("Sucesso 0km", 0))
+incons_0km = int(ultima.get("Inconsistência 0km", 0))
+
+total_sucesso = sucesso_trf + sucesso_0km
+total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
+
+robos = status_robos(df, df_criticas, df_hist)
+
+
+# =========================
+# TÍTULO
+# =========================
+
+st.markdown(
+    f"""
+    <div class="hive-title">Monitoramento e-CRV</div>
+    <div class="hive-subtitle">
+        Última coleta: <b>{hora_coleta}</b>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# =========================
+# CARDS
+# =========================
+
+cols = st.columns(5)
+
+with cols[0]:
+    render_card(
+        "Fila Transferências",
+        fila_trf,
+        cor_saude(fila_trf, media_coluna(df_media, "Fila 2 e 3"), "negativo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[1]:
+    render_card(
+        "Sucesso Transferências",
+        sucesso_trf,
+        cor_saude(sucesso_trf, media_coluna(df_media, "Sucesso 2 e 3"), "positivo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[2]:
+    render_card(
+        "Inconsistências Transferências",
+        incons_trf,
+        cor_saude(incons_trf, media_coluna(df_media, "Inconsistência 2 e 3"), "negativo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[3]:
+    render_card(
+        "Automatizado",
+        automatizado,
+        cor_saude(automatizado, media_coluna(df_media, "Automatizado"), "positivo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[4]:
+    render_card(
+        "Inconsistências Críticas",
+        total_criticas_minuto,
+        cor_criticas_minuto(total_criticas_minuto),
+        "Total de críticas do minuto atual",
+    )
+
+cols = st.columns(5)
+
+with cols[0]:
+    render_card(
+        "Fila 0KM",
+        fila_0km,
+        cor_saude(fila_0km, media_coluna(df_media, "Fila 0km"), "negativo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[1]:
+    render_card(
+        "Sucesso 0KM",
+        sucesso_0km,
+        cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km"), "positivo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[2]:
+    render_card(
+        "Inconsistências 0KM",
+        incons_0km,
+        cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km"), "negativo"),
+        f"Último registro: {hora_coleta}",
+    )
+
+with cols[3]:
+    render_card(
+        "Total",
+        total_sucesso,
+        "#8AB4FF",
+        "Sucesso Transferências + Sucesso 0KM",
+    )
+
+with cols[4]:
+    render_robos_card(robos, robo_monitoramento_online)
+
+
+# =========================
+# GRÁFICOS
+# =========================
+
+c1, c2 = st.columns(2)
+
+with c1:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+    st.plotly_chart(
+        line_chart(
+            df,
+            ["Sucesso 2 e 3"],
+            "Transferências - Sucesso",
+        ),
+        use_container_width=False,
+    )
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+    st.plotly_chart(
+        line_chart(
+            df,
+            ["Fila 2 e 3", "Inconsistência 2 e 3"],
+            "Transferências - Fila e Inconsistências",
+        ),
+        use_container_width=False,
+    )
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with c2:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+    st.plotly_chart(
+        line_chart(
+            df,
+            ["Sucesso 0km"],
+            "0KM - Sucesso",
+        ),
+        use_container_width=False,
+    )
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+    st.plotly_chart(
+        line_chart(
+            df,
+            ["Fila 0km", "Inconsistência 0km"],
+            "0KM - Fila e Inconsistências",
+        ),
+        use_container_width=False,
+    )
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================
+# TABELAS DE HISTÓRICO E INCONSISTÊNCIAS
+# =========================
+
+st.markdown('<div class="panel">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title">Histórico de Inconsistências Críticas</div>', unsafe_allow_html=True)
+
+if df_hist is None or df_hist.empty:
+    st.info("Histórico de críticas ainda não disponível.")
+else:
+    df_crit_minuto = tabela_historico_criticas_minuto(df_hist)
+    if df_crit_minuto.empty:
+        render_mensagem_tabela("Não há histórico de críticas do minuto para exibir.")
+    else:
+        render_tabela_escura(df_crit_minuto)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+st.markdown('<div class="panel">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title">Inconsistências - Top 3 no ciclo atual</div>', unsafe_allow_html=True)
+
+df_top3 = tabela_top3_ciclo_atual(df_hist)
+if df_top3.empty:
+    render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
+else:
+    render_tabela_escura(df_top3)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+st.markdown('<div class="panel">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title">Tabela de Inconsistências Novas</div>', unsafe_allow_html=True)
+
+df_novas = tabela_inconsistencias_desconhecidas(df_hist)
+if df_novas.empty:
+    render_mensagem_tabela("Não foram encontradas inconsistências desconhecidas.")
+else:
+    render_tabela_escura(df_novas)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+st.markdown('<div class="panel">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title">Histórico de Inconsistências por Serviço - Ciclo Atual</div>', unsafe_allow_html=True)
+
+servicos_tabelas = [
+    ("Primeiro Registro / 0KM", "0KM"),
+    ("Transferência de Proprietário", "Transferência 2"),
+    ("Transferência de Município/Estado", "Transferência 3"),
+]
+
+for titulo_servico, chave_servico in servicos_tabelas:
+    st.markdown(
+        f'<div style="font-size:13px; font-weight:900; color:#EAF4FF; margin:14px 0 8px 0;">{titulo_servico}</div>',
+        unsafe_allow_html=True,
+    )
+    df_serv = tabela_historico_servico(df_hist, chave_servico)
+    if df_serv.empty:
+        render_mensagem_tabela("Sem inconsistências registradas para este serviço no ciclo atual.")
+    else:
+        render_tabela_escura(df_serv)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================
+# RODAPÉ / AUTO REFRESH
+# =========================
+
+st.markdown(
+    f"""
+    <div class="footer-note">
+        Verificação automática a cada {INTERVALO_VERIFICACAO_SEGUNDOS}s.
+        O dashboard recarrega os dados quando os arquivos Excel são modificados.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+time.sleep(INTERVALO_VERIFICACAO_SEGUNDOS)
+st.rerun()
