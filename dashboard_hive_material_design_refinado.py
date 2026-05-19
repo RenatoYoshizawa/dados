@@ -2056,12 +2056,16 @@ elif pagina == "Histórico monitoramento":
         colunas_exibir = [
             c for c in df_dia.columns
             if (
-                c != "Data"
-                and c != "Data/Hora"
+                c not in ("Data", "Data/Hora")
                 and "Horário;Automatizado;Fila 2 e 3" not in str(c)
+                and "Anexo" not in str(c)
+                and "anexo" not in str(c)
             )
         ]
 
+df_tabela = df_dia[colunas_exibir].copy().fillna("")
+
+render_tabela_escura(df_tabela)
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
