@@ -253,7 +253,7 @@ button[kind="header"] {
 }
 
 .chart-inner {
-    min-width: 1600px;
+    min-width: 1250px;
 }
 
 .dark-table {
@@ -279,6 +279,11 @@ button[kind="header"] {
 .dark-table tbody td {
     padding: 9px;
     border-bottom: 1px solid var(--md-border);
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 520px;
+    vertical-align: top;
 }
 
 .dark-table tbody tr:nth-child(even) {
@@ -1278,11 +1283,11 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
 
     st.markdown(html, unsafe_allow_html=True)
 
-def fig_layout(fig, height=360):
+def fig_layout(fig, height=520):
     fig.update_layout(
         height=height,
-        width=1600,
-        margin=dict(l=22, r=22, t=170, b=35),
+        width=1250,
+        margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#FFFFFF",
         font=dict(color="#202124", family="Google Sans, Roboto, Arial"),
@@ -1393,13 +1398,47 @@ def line_chart(df, cols, title):
         )
     )
 
-    return fig_layout(fig)
+    return fig_layout(fig, height=520)
+
+def quebrar_texto_longo(valor, limite=90):
+    texto = str(valor or "")
+
+    if len(texto) <= limite:
+        return texto
+
+    partes = []
+    atual = ""
+
+    for pedaco in texto.split(" "):
+        if len(atual) + len(pedaco) + 1 > limite:
+            partes.append(atual.strip())
+            atual = pedaco
+        else:
+            atual += " " + pedaco
+
+    if atual.strip():
+        partes.append(atual.strip())
+
+    return "<br>".join(partes)
+
 
 def render_tabela_escura(df_tabela: pd.DataFrame):
 
     df_tabela = df_tabela.copy()
 
     for col in df_tabela.columns:
+
+        nome_col = str(col).lower()
+
+        if (
+            "descr" in nome_col
+            or "mensagem" in nome_col
+            or "erro" in nome_col
+            or "retorno" in nome_col
+            or "inconsist" in nome_col
+        ):
+            df_tabela[col] = df_tabela[col].apply(lambda x: quebrar_texto_longo(x, limite=90))
+            continue
 
         try:
             serie = pd.to_numeric(df_tabela[col], errors="coerce")
@@ -1590,7 +1629,7 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
 def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.DataFrame:
     base = _preparar_historico_full_total(df_hist)
     if base.empty:
-        return pd.DataFrame(columns=["Descrição", "Total", "%", "Ciclo atual"])
+        return pd.DataFrame(columns=["Descrição", "Total", "%"])
 
     if chave_servico == "Transferências":
         base = base[base["_chave_servico"].isin(["Transferência 2", "Transferência 3"])].copy()
@@ -1598,7 +1637,7 @@ def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.Da
         base = base[base["_chave_servico"] == chave_servico].copy()
 
     if base.empty:
-        return pd.DataFrame(columns=["Descrição", "Total", "%", "Ciclo atual"])
+        return pd.DataFrame(columns=["Descrição", "Total", "%"])
 
     base = (
         base.groupby("Descrição", as_index=False)
@@ -1626,9 +1665,8 @@ def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.Da
     else:
         base["%"] = "0,00%"
 
-    return base[["Descrição", "Total ciclo atual", "%", "Diferença"]].rename(columns={
-        "Total ciclo atual": "Total",
-        "Diferença": "Ciclo atual"
+    return base[["Descrição", "Total ciclo atual", "%"]].rename(columns={
+        "Total ciclo atual": "Total"
     })
 
 
@@ -2215,6 +2253,7 @@ elif pagina == "Histórico monitoramento":
             if df_serv.empty:
                 render_mensagem_tabela("Sem histórico de inconsistências para este serviço na data selecionada.")
             else:
+                df_serv = df_serv.drop(columns=["Ciclo atual"], errors="ignore")
                 render_tabela_escura(df_serv.fillna(""))
 
     st.markdown("</div>", unsafe_allow_html=True)
