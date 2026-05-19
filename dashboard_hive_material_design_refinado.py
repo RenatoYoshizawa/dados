@@ -258,6 +258,7 @@ button[kind="header"] {
 
 .dark-table {
     width: 100%;
+    table-layout: auto;
     border-collapse: collapse;
     background: var(--md-surface);
     color: var(--md-text);
@@ -274,44 +275,42 @@ button[kind="header"] {
     padding: 10px;
     font-weight: 600;
     border-bottom: 1px solid var(--md-border);
-}
-
-.dark-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    background: var(--md-surface);
-    color: var(--md-text);
-    font-size: 12px;
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: var(--md-shadow);
+    vertical-align: middle;
+    height: auto !important;
+    min-height: 0 !important;
+    white-space: nowrap;
 }
 
 .dark-table tbody td {
     padding: 9px;
     border-bottom: 1px solid var(--md-border);
     white-space: normal;
-    word-break: break-word;
+    word-break: normal;
     overflow-wrap: break-word;
     vertical-align: top;
+    height: auto !important;
 }
 
-.dark-table td:nth-child(1),
-.dark-table th:nth-child(1) {
-    width: 78%;
+/* Tabelas de 3 colunas: Data/Hora | Inconsistência | Total */
+.dark-table.tabela-3col th:nth-child(1),
+.dark-table.tabela-3col td:nth-child(1) {
+    width: 190px;
+    max-width: 190px;
+    white-space: nowrap;
 }
 
-.dark-table td:nth-child(2),
-.dark-table th:nth-child(2) {
-    width: 10%;
+.dark-table.tabela-3col th:nth-child(2),
+.dark-table.tabela-3col td:nth-child(2) {
+    width: auto;
+    min-width: 420px;
+}
+
+.dark-table.tabela-3col th:nth-child(3),
+.dark-table.tabela-3col td:nth-child(3) {
+    width: 120px;
+    max-width: 120px;
     text-align: center;
-}
-
-.dark-table td:nth-child(3),
-.dark-table th:nth-child(3) {
-    width: 12%;
-    text-align: center;
+    white-space: nowrap;
 }
 
 .dark-table tbody tr:nth-child(even) {
@@ -1428,8 +1427,41 @@ def line_chart(df, cols, title):
 
     return fig_layout(fig, height=520)
 
-def quebrar_texto_longo(valor, limite=90):
-    texto = str(valor or "")
+def extrair_mensagem_inconsistencia(valor):
+    texto = str(valor or "").strip()
+
+    if not texto:
+        return ""
+
+    try:
+        obj = json.loads(texto)
+        if isinstance(obj, dict):
+            return str(
+                obj.get("mensagem")
+                or obj.get("ERRORMESSAGE")
+                or obj.get("WEBERRORMESSAGE")
+                or texto
+            ).strip()
+    except Exception:
+        pass
+
+    # Alguns retornos chegam como texto quase JSON, mas sem dois-pontos.
+    texto_upper = texto.upper()
+    for chave in ["ERRORMESSAGE", "WEBERRORMESSAGE", "MENSAGEM"]:
+        pos = texto_upper.find(chave)
+        if pos >= 0:
+            recorte = texto[pos + len(chave):]
+            recorte = recorte.replace('":', " ").replace('";', " ")
+            recorte = recorte.replace('"', " ").replace("}", " ")
+            recorte = " ".join(recorte.split())
+            if recorte:
+                return recorte
+
+    return texto
+
+
+def quebrar_texto_longo(valor, limite=120):
+    texto = extrair_mensagem_inconsistencia(valor)
 
     if len(texto) <= limite:
         return texto
@@ -1482,11 +1514,13 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         except Exception:
             pass
 
+    classe_extra = " tabela-3col" if len(df_tabela.columns) == 3 else ""
+
     html = df_tabela.to_html(index=False, escape=False)
 
     html = html.replace(
         '<table border="1" class="dataframe">',
-        '<table class="dark-table">'
+        f'<table class="dark-table{classe_extra}">'
     )
 
     st.markdown(html, unsafe_allow_html=True)
