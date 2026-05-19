@@ -330,7 +330,7 @@ menu_html = """
 </div>
 """
 
-st.markdown(menu_html, unsafe_allow_html=True)
+st.html(menu_html)
 
 # =========================
 # GITHUB / CACHE LOCAL
