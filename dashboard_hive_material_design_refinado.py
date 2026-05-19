@@ -1549,21 +1549,22 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         except Exception:
             pass
 
-    colunas_lower = [str(c).strip().lower() for c in df_tabela.columns]
+colunas_lower = [str(c).strip().lower() for c in df_tabela.columns]
 
-    if "data/hora" in colunas_lower and (
-        "inconsistência" in colunas_lower or "inconsistencia" in colunas_lower
-    ):
-        classe_extra = " tabela-criticas"
+if "data/hora" in colunas_lower and (
+    "inconsistência" in colunas_lower
+    or "inconsistencia" in colunas_lower
+):
+    classe_extra = " tabela-criticas"
 
+elif (
+    ("descrição" in colunas_lower or "descricao" in colunas_lower)
+    and "%" in colunas_lower
+):
+    classe_extra = " tabela-descricao"
 
-        elif (
-            ("descrição" in colunas_lower or "descricao" in colunas_lower)
-            and "%" in colunas_lower
-        ):
-        classe_extra = " tabela-descricao"
-    else:
-        classe_extra = ""
+else:
+    classe_extra = ""
 
     html = df_tabela.to_html(index=False, escape=False)
 
