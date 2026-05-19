@@ -49,7 +49,6 @@ INTERVALO_VERIFICACAO_SEGUNDOS = 10
 
 st.set_page_config(
     page_title="Monitoramento e-CRV",
-    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -281,37 +280,51 @@ div[data-testid="stDataFrame"] [role="gridcell"] {
 .dark-table tbody tr:nth-child(even) { background: #FAFAFA; }
 .dark-table tbody tr:nth-child(odd) { background: var(--md-surface); }
 
-/* Sidebar recolhida e expansível no hover */
+/* =========================
+   SIDEBAR MATERIAL
+========================= */
+
 section[data-testid="stSidebar"] {
-    width: 58px !important;
-    min-width: 58px !important;
-    transition: width 0.25s ease;
+    background: #FFFFFF !important;
+    border-right: 1px solid #E5E7EB;
+    width: 64px !important;
+    min-width: 64px !important;
+    transition: all 0.25s ease;
     overflow-x: hidden;
-    background: #FFFFFF;
-    border-right: 1px solid #E0E3EB;
-    box-shadow: 0 1px 2px rgba(60,64,67,.10), 0 2px 6px rgba(60,64,67,.08);
 }
 
 section[data-testid="stSidebar"]:hover {
-    width: 292px !important;
-    min-width: 292px !important;
+    width: 280px !important;
+    min-width: 280px !important;
+}
+
+section[data-testid="stSidebar"] > div {
+    width: 280px !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+    padding-top: 18px;
+}
+
+/* Esconde texto quando fechado */
+section[data-testid="stSidebar"]:not(:hover) label,
+section[data-testid="stSidebar"]:not(:hover) .stRadio,
+section[data-testid="stSidebar"]:not(:hover) p,
+section[data-testid="stSidebar"]:not(:hover) h1,
+section[data-testid="stSidebar"]:not(:hover) h2,
+section[data-testid="stSidebar"]:not(:hover) h3 {
     opacity: 0;
-    transition: opacity 0.20s ease;
-    padding-top: 16px;
 }
 
-section[data-testid="stSidebar"]:hover [data-testid="stSidebarContent"] {
-    opacity: 1;
-}
-
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] div {
-    font-family: "Google Sans", "Roboto", Arial, sans-serif;
+/* Ícone/menu */
+section[data-testid="stSidebar"]::before {
+    content: "☰";
+    position: absolute;
+    top: 14px;
+    left: 22px;
+    font-size: 24px;
+    color: #5F6368;
+    z-index: 9999;
 }
 
 </style>
@@ -319,11 +332,15 @@ section[data-testid="stSidebar"] div {
 st.markdown(CSS, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### Menu")
+
+    st.markdown("## Monitoramento")
+
     pagina = st.radio(
-        "Navegação",
-        ["Monitoramento atual", "Histórico monitoramento"],
-        label_visibility="collapsed",
+        "",
+        [
+            "Monitoramento atual",
+            "Histórico monitoramento",
+        ],
     )
 
 
