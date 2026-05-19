@@ -40,7 +40,7 @@ ARQ_LOCAL_MONITORAMENTO_HIST = CACHE_DIR / "Monitoramento_Historico.csv"
 ARQ_LOCAL_INCONSISTENCIAS_HIST = CACHE_DIR / "Inconsistencias_Historico.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 
-INTERVALO_VERIFICACAO_SEGUNDOS = 10
+INTERVALO_VERIFICACAO_SEGUNDOS = 30
 
 
 # =========================
