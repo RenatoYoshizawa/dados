@@ -348,6 +348,26 @@ button[kind="header"] {
     white-space: nowrap;
 }
 
+/* Scroll para tabelas extensas */
+.table-scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border-radius: 18px;
+    box-shadow: var(--md-shadow);
+}
+
+.table-scroll table {
+    box-shadow: none !important;
+}
+
+.table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+
 .dark-table tbody tr:nth-child(even) {
     background: #FAFAFA;
 }
@@ -1550,19 +1570,13 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
             pass
 
     colunas_lower = [str(c).strip().lower() for c in df_tabela.columns]
-    
+
     if "data/hora" in colunas_lower and (
-        "inconsistência" in colunas_lower
-        or "inconsistencia" in colunas_lower
+        "inconsistência" in colunas_lower or "inconsistencia" in colunas_lower
     ):
         classe_extra = " tabela-criticas"
-    
-    elif (
-        ("descrição" in colunas_lower or "descricao" in colunas_lower)
-        and "%" in colunas_lower
-    ):
+    elif "descrição" in colunas_lower or "descricao" in colunas_lower:
         classe_extra = " tabela-descricao"
-    
     else:
         classe_extra = ""
 
@@ -2279,7 +2293,9 @@ elif pagina == "Histórico monitoramento":
         df_tabela = df_dia[colunas_exibir].copy().fillna("")
 
         if not df_tabela.empty:
+            st.markdown('<div class="table-scroll">', unsafe_allow_html=True)
             render_tabela_escura(df_tabela)
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
             render_mensagem_tabela("Nenhuma coluna disponível para exibição.")
 
