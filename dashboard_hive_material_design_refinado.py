@@ -417,10 +417,24 @@ def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigato
     conteudo_b64 = dados.get("content", "")
     encoding = dados.get("encoding", "")
 
-    if not conteudo_b64 or encoding != "base64":
-        raise RuntimeError(f"GitHub não retornou conteúdo base64 válido para {caminho_repo}")
+    # Para arquivos maiores, a API Contents do GitHub pode não retornar
+    # o campo "content" em base64. Nesses casos, faz fallback pelo download_url.
+    if conteudo_b64 and encoding == "base64":
+        conteudo = base64.b64decode(conteudo_b64)
+    else:
+        download_url = dados.get("download_url")
+        if not download_url:
+            raise RuntimeError(
+                f"GitHub não retornou conteúdo base64 nem download_url válido para {caminho_repo}"
+            )
 
-    conteudo = base64.b64decode(conteudo_b64)
+        resp_download = requests.get(
+            download_url,
+            headers=github_headers(),
+            timeout=60,
+        )
+        resp_download.raise_for_status()
+        conteudo = resp_download.content
 
     tmp = destino.with_suffix(destino.suffix + ".tmp")
     tmp.write_bytes(conteudo)
