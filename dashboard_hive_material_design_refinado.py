@@ -2042,17 +2042,6 @@ elif pagina == "Histórico monitoramento":
     if df_dia.empty:
         render_mensagem_tabela("Não há registros de monitoramento para a data selecionada.")
     else:
-        colunas_ocultar = {
-            "Data",
-            "Data/Hora",
-        }
-        
-        colunas_ocultar = {
-            "Data",
-            "Data/Hora",
-            "Horário;Automatizado;Fila 2 e 3;Sucesso 2 e 3;Inconsistência 2 e 3;Fila 0km;Sucesso 0km"
-        }
-        
         colunas_exibir = [
             c for c in df_dia.columns
             if (
@@ -2063,9 +2052,13 @@ elif pagina == "Histórico monitoramento":
             )
         ]
 
-df_tabela = df_dia[colunas_exibir].copy().fillna("")
+        df_tabela = df_dia[colunas_exibir].copy().fillna("")
 
-    render_tabela_escura(df_tabela)
+        if not df_tabela.empty:
+            render_tabela_escura(df_tabela)
+        else:
+            render_mensagem_tabela("Nenhuma coluna disponível para exibição.")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
