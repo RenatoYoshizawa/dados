@@ -2055,14 +2055,12 @@ elif pagina == "Histórico monitoramento":
         
         colunas_exibir = [
             c for c in df_dia.columns
-            if c not in colunas_ocultar
+            if (
+                c != "Data"
+                and c != "Data/Hora"
+                and "Horário;Automatizado;Fila 2 e 3" not in str(c)
+            )
         ]
-        
-        st.dataframe(
-            df_dia[colunas_exibir],
-            use_container_width=True,
-            hide_index=True
-        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
