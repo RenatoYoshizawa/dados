@@ -306,33 +306,31 @@ pagina = query_params.get(
     "Monitoramento atual"
 )
 
-st.markdown(
-    """
-    <div class="hover-menu">
+menu_html = """
+<div class="hover-menu">
 
-        <div class="menu-icon">
-            ☰
-        </div>
-
-        <div class="menu-title">
-            Monitoramento
-        </div>
-
-        <a class="menu-item"
-           href="?pagina=Monitoramento atual">
-           📊 Monitoramento atual
-        </a>
-
-        <a class="menu-item"
-           href="?pagina=Histórico monitoramento">
-           📁 Histórico monitoramento
-        </a>
-
+    <div class="menu-icon">
+        ☰
     </div>
-    """,
-    unsafe_allow_html=True,
-)
 
+    <div class="menu-title">
+        Monitoramento
+    </div>
+
+    <a class="menu-item"
+       href="?pagina=Monitoramento atual">
+       📊 Monitoramento atual
+    </a>
+
+    <a class="menu-item"
+       href="?pagina=Histórico monitoramento">
+       📁 Histórico monitoramento
+    </a>
+
+</div>
+"""
+
+st.markdown(menu_html, unsafe_allow_html=True)
 
 # =========================
 # GITHUB / CACHE LOCAL
