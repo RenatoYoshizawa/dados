@@ -276,14 +276,42 @@ button[kind="header"] {
     border-bottom: 1px solid var(--md-border);
 }
 
+.dark-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: var(--md-surface);
+    color: var(--md-text);
+    font-size: 12px;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: var(--md-shadow);
+}
+
 .dark-table tbody td {
     padding: 9px;
     border-bottom: 1px solid var(--md-border);
     white-space: normal;
     word-break: break-word;
-    overflow-wrap: anywhere;
-    max-width: 520px;
+    overflow-wrap: break-word;
     vertical-align: top;
+}
+
+.dark-table td:nth-child(1),
+.dark-table th:nth-child(1) {
+    width: 78%;
+}
+
+.dark-table td:nth-child(2),
+.dark-table th:nth-child(2) {
+    width: 10%;
+    text-align: center;
+}
+
+.dark-table td:nth-child(3),
+.dark-table th:nth-child(3) {
+    width: 12%;
+    text-align: center;
 }
 
 .dark-table tbody tr:nth-child(even) {
