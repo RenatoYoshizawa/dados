@@ -357,17 +357,27 @@ button[kind="header"] {
     box-shadow: var(--md-shadow);
     margin-top: 6px;
     display: block;
+    position: relative;
 }
 
-.table-scroll table {
+.table-scroll .dark-table {
     box-shadow: none !important;
     margin-bottom: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
 }
 
-.table-scroll thead th {
+.table-scroll .dark-table thead {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 50;
+}
+
+.table-scroll .dark-table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 60 !important;
+    background: var(--md-surface-variant) !important;
 }
 
 
