@@ -83,14 +83,106 @@ CSS = """
     font-family: "Google Sans", "Roboto", Arial, sans-serif;
 }
 
-[data-testid="stHeader"] { background: transparent; }
-[data-testid="stToolbar"] { display: none; }
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+[data-testid="stToolbar"] {
+    display: none;
+}
+
+/* REMOVE COMPLETAMENTE SIDEBAR NATIVA */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* REMOVE BOTÃO NATIVO */
+button[kind="header"] {
+    display: none !important;
+}
+
+/* REMOVE ESPAÇO LATERAL */
+[data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+}
 
 .block-container {
     padding-top: 1.4rem;
     padding-bottom: 1rem;
+    padding-left: 5rem;
     max-width: 100%;
 }
+
+/* =========================
+   MENU LATERAL HOVER
+========================= */
+
+.hover-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 58px;
+    height: 100vh;
+    background: #FFFFFF;
+    border-right: 1px solid #E0E3EB;
+    box-shadow: 0 1px 2px rgba(60,64,67,.10),
+                0 2px 6px rgba(60,64,67,.08);
+    z-index: 999999999;
+    transition: width 0.25s ease;
+    overflow: hidden;
+    padding-top: 18px;
+}
+
+.hover-menu:hover {
+    width: 280px;
+}
+
+.menu-icon {
+    font-size: 24px;
+    color: #5F6368;
+    padding-left: 18px;
+    margin-bottom: 28px;
+}
+
+.menu-title {
+    opacity: 0;
+    white-space: nowrap;
+    font-size: 16px;
+    font-weight: 700;
+    color: #202124;
+    padding: 0 18px 18px 18px;
+    transition: opacity 0.2s ease;
+}
+
+.hover-menu:hover .menu-title {
+    opacity: 1;
+}
+
+.menu-item {
+    display: block;
+    opacity: 0;
+    white-space: nowrap;
+    text-decoration: none !important;
+    color: #202124 !important;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 13px 18px;
+    transition: opacity 0.2s ease,
+                background 0.2s ease;
+}
+
+.hover-menu:hover .menu-item {
+    opacity: 1;
+}
+
+.menu-item:hover {
+    background: #E8F0FE;
+    color: #1A73E8 !important;
+}
+
+/* =========================
+   RESTANTE CSS
+========================= */
 
 .hive-title {
     font-size: 30px;
@@ -98,8 +190,6 @@ CSS = """
     color: var(--md-text);
     margin-bottom: 2px;
     letter-spacing: -.2px;
-    position: relative;
-    z-index: 999;
 }
 
 .hive-subtitle {
@@ -108,19 +198,16 @@ CSS = """
     font-weight: 400;
     margin-top: 2px;
     margin-bottom: 18px;
-    position: relative;
-    z-index: 999;
 }
 
 .kpi-card {
     background: var(--md-surface);
     border: none;
     border-radius: 24px;
-    padding: 20px 20px 18px 20px;
+    padding: 20px;
     min-height: 148px;
     box-shadow: var(--md-shadow);
     margin-bottom: 18px;
-    overflow: hidden;
 }
 
 .kpi-label {
@@ -128,8 +215,6 @@ CSS = """
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .32px;
-    min-height: 32px;
 }
 
 .kpi-value {
@@ -137,19 +222,16 @@ CSS = """
     font-weight: 600;
     line-height: 1.08;
     margin-top: 8px;
-    white-space: nowrap;
 }
 
 .kpi-note {
     color: var(--md-muted);
     font-size: 11px;
-    font-weight: 400;
     margin-top: 9px;
 }
 
 .panel {
     background: var(--md-surface);
-    border: none;
     border-radius: 24px;
     padding: 20px 22px 16px 22px;
     box-shadow: var(--md-shadow);
@@ -161,48 +243,6 @@ CSS = """
     font-weight: 600;
     color: var(--md-text);
     margin-bottom: 10px;
-    letter-spacing: .1px;
-}
-
-.robot-line {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--md-text);
-}
-
-.robot-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    min-width: 12px;
-    border-radius: 50%;
-}
-
-.robot-dot.on { background: var(--md-green); }
-.robot-dot.off { background: var(--md-red); }
-
-.robot-status {
-    font-size: 12px;
-    font-weight: 600;
-    min-width: 28px;
-}
-
-.robot-status.on { color: var(--md-green); }
-.robot-status.off { color: var(--md-red); }
-
-.footer-note {
-    color: var(--md-muted);
-    font-size: 12px;
-    text-align: right;
-}
-
-[data-testid="column"] {
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
 }
 
 .chart-scroll {
@@ -214,37 +254,6 @@ CSS = """
 
 .chart-inner {
     min-width: 1600px;
-}
-
-/* DataFrames nativos do Streamlit */
-div[data-testid="stDataFrame"] {
-    border: none;
-    border-radius: 18px;
-    background: var(--md-surface);
-    box-shadow: var(--md-shadow);
-}
-
-div[data-testid="stDataFrame"] > div,
-div[data-testid="stDataFrame"] [role="table"],
-div[data-testid="stDataFrame"] .glideDataEditor,
-div[data-testid="stDataFrame"] .dvn-scroller,
-div[data-testid="stDataFrame"] .gdg-cell {
-    background: var(--md-surface) !important;
-    color: var(--md-text) !important;
-}
-
-div[data-testid="stDataFrame"] [role="columnheader"],
-div[data-testid="stDataFrame"] .gdg-header {
-    background: var(--md-surface-variant) !important;
-    color: var(--md-text) !important;
-    font-weight: 600 !important;
-    border-bottom: 1px solid var(--md-border) !important;
-}
-
-div[data-testid="stDataFrame"] [role="gridcell"] {
-    background: var(--md-surface) !important;
-    color: var(--md-text) !important;
-    border-color: var(--md-border) !important;
 }
 
 .dark-table {
@@ -269,79 +278,60 @@ div[data-testid="stDataFrame"] [role="gridcell"] {
 
 .dark-table tbody td {
     padding: 9px;
-    color: var(--md-text);
     border-bottom: 1px solid var(--md-border);
-    max-width: 520px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.dark-table tbody tr:nth-child(even) { background: #FAFAFA; }
-.dark-table tbody tr:nth-child(odd) { background: var(--md-surface); }
-
-/* =========================
-   SIDEBAR MATERIAL
-========================= */
-
-section[data-testid="stSidebar"] {
-    background: #FFFFFF !important;
-    border-right: 1px solid #E5E7EB;
-    width: 64px !important;
-    min-width: 64px !important;
-    transition: all 0.25s ease;
-    overflow-x: hidden;
+.dark-table tbody tr:nth-child(even) {
+    background: #FAFAFA;
 }
 
-section[data-testid="stSidebar"]:hover {
-    width: 280px !important;
-    min-width: 280px !important;
-}
-
-section[data-testid="stSidebar"] > div {
-    width: 280px !important;
-}
-
-section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-    padding-top: 18px;
-}
-
-/* Esconde texto quando fechado */
-section[data-testid="stSidebar"]:not(:hover) label,
-section[data-testid="stSidebar"]:not(:hover) .stRadio,
-section[data-testid="stSidebar"]:not(:hover) p,
-section[data-testid="stSidebar"]:not(:hover) h1,
-section[data-testid="stSidebar"]:not(:hover) h2,
-section[data-testid="stSidebar"]:not(:hover) h3 {
-    opacity: 0;
-}
-
-/* Ícone/menu */
-section[data-testid="stSidebar"]::before {
-    content: "☰";
-    position: absolute;
-    top: 14px;
-    left: 22px;
-    font-size: 24px;
-    color: #5F6368;
-    z-index: 9999;
+.dark-table tbody tr:nth-child(odd) {
+    background: var(--md-surface);
 }
 
 </style>
 """
+
 st.markdown(CSS, unsafe_allow_html=True)
 
-with st.sidebar:
 
-    st.markdown("## Monitoramento")
+# =========================
+# MENU
+# =========================
 
-    pagina = st.radio(
-        "",
-        [
-            "Monitoramento atual",
-            "Histórico monitoramento",
-        ],
-    )
+query_params = st.query_params
+
+pagina = query_params.get(
+    "pagina",
+    "Monitoramento atual"
+)
+
+st.markdown(
+    """
+    <div class="hover-menu">
+
+        <div class="menu-icon">
+            ☰
+        </div>
+
+        <div class="menu-title">
+            Monitoramento
+        </div>
+
+        <a class="menu-item"
+           href="?pagina=Monitoramento atual">
+           📊 Monitoramento atual
+        </a>
+
+        <a class="menu-item"
+           href="?pagina=Histórico monitoramento">
+           📁 Histórico monitoramento
+        </a>
+
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # =========================
