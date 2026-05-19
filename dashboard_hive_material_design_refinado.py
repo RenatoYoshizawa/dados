@@ -36,7 +36,7 @@ ARQ_LOCAL_CRITICAS = CACHE_DIR / "Criticas.xlsx"
 ARQ_LOCAL_HISTORICO = CACHE_DIR / "Historico_Criticas.xlsx"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 
-INTERVALO_VERIFICACAO_SEGUNDOS = 10
+INTERVALO_VERIFICACAO_SEGUNDOS = 60
 
 
 # =========================
