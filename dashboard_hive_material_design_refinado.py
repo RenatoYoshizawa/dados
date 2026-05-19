@@ -2047,6 +2047,12 @@ elif pagina == "Histórico monitoramento":
             "Data/Hora",
         }
         
+        colunas_ocultar = {
+            "Data",
+            "Data/Hora",
+            "Horário;Automatizado;Fila 2 e 3;Sucesso 2 e 3;Inconsistência 2 e 3;Fila 0km;Sucesso 0km"
+        }
+        
         colunas_exibir = [
             c for c in df_dia.columns
             if c not in colunas_ocultar
