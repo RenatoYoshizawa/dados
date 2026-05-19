@@ -356,6 +356,7 @@ button[kind="header"] {
     border-radius: 18px;
     box-shadow: var(--md-shadow);
     margin-top: 6px;
+    display: block;
 }
 
 .table-scroll table {
@@ -366,7 +367,7 @@ button[kind="header"] {
 .table-scroll thead th {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 20;
 }
 
 
@@ -1624,7 +1625,7 @@ def formatar_valor_tabela(valor):
     except Exception:
         return texto
 
-def render_tabela_escura(df_tabela: pd.DataFrame):
+def render_tabela_escura(df_tabela: pd.DataFrame, scroll: bool = False):
 
     df_tabela = df_tabela.copy()
 
@@ -1666,6 +1667,9 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         '<table border="1" class="dataframe">',
         f'<table class="dark-table{classe_extra}">'
     )
+
+    if scroll:
+        html = f'<div class="table-scroll">{html}</div>'
 
     st.markdown(html, unsafe_allow_html=True)
 
@@ -2342,6 +2346,7 @@ elif pagina == "Histórico monitoramento":
         value=datas_disponiveis[0],
         min_value=min(datas_disponiveis),
         max_value=max(datas_disponiveis),
+        format="DD/MM/YYYY",
     )
 
     data_ref = pd.to_datetime(data_selecionada, errors="coerce").date()
@@ -2373,9 +2378,7 @@ elif pagina == "Histórico monitoramento":
         df_tabela = df_dia[colunas_exibir].copy().fillna("")
 
         if not df_tabela.empty:
-            st.markdown('<div class="table-scroll">', unsafe_allow_html=True)
-            render_tabela_escura(df_tabela)
-            st.markdown('</div>', unsafe_allow_html=True)
+            render_tabela_escura(df_tabela, scroll=True)
         else:
             render_mensagem_tabela("Nenhuma coluna disponível para exibição.")
 
