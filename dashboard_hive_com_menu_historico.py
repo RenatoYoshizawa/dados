@@ -754,12 +754,30 @@ def carregar_csv_historico(path_str: str, mtime: float):
     if "Horário" in df.columns:
         df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
 
+    colunas_nao_numericas = {
+        "Data/Hora",
+        "Data",
+        "Horário",
+        "Tipo Histórico",
+        "Tipo Historico",
+        "Serviço",
+        "Servico",
+        "Inconsistência",
+        "Inconsistencia",
+        "Inconsistência nova no ciclo?",
+        "STOP PROCESSO ativado?",
+        "Serviços desligados",
+        "Falhas ao desligar",
+    }
+
     for col in df.columns:
-        if col not in ("Data/Hora", "Data", "Horário"):
-            df[col] = pd.to_numeric(df[col], errors="ignore")
+        if col not in colunas_nao_numericas:
+            convertido = pd.to_numeric(df[col], errors="coerce")
+
+            if convertido.notna().any():
+                df[col] = convertido.fillna(0)
 
     return df
-
 
 def agrupar_monitoramento_por_horario(df_base: pd.DataFrame) -> pd.DataFrame:
     if df_base is None or df_base.empty or "Horário" not in df_base.columns:
