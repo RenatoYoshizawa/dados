@@ -27,6 +27,8 @@ GITHUB_BRANCH = "main"
 GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
 GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
+GITHUB_ARQ_MONITORAMENTO_HIST = f"historico/Monitoramento_{datetime.now().strftime('%Y_%m')}.csv"
+GITHUB_ARQ_INCONSISTENCIAS_HIST = f"historico/Inconsistencias_{datetime.now().strftime('%Y_%m')}.csv"
 
 CACHE_DIR = Path("/tmp/monitoramento_ecrv_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -34,9 +36,11 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 ARQ_LOCAL_MONITORAMENTO = CACHE_DIR / "Monitoramento.xlsx"
 ARQ_LOCAL_CRITICAS = CACHE_DIR / "Criticas.xlsx"
 ARQ_LOCAL_HISTORICO = CACHE_DIR / "Historico_Criticas.xlsx"
+ARQ_LOCAL_MONITORAMENTO_HIST = CACHE_DIR / "Monitoramento_Historico.csv"
+ARQ_LOCAL_INCONSISTENCIAS_HIST = CACHE_DIR / "Inconsistencias_Historico.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 
-INTERVALO_VERIFICACAO_SEGUNDOS = 60
+INTERVALO_VERIFICACAO_SEGUNDOS = 10
 
 
 # =========================
@@ -45,7 +49,6 @@ INTERVALO_VERIFICACAO_SEGUNDOS = 60
 
 st.set_page_config(
     page_title="Monitoramento e-CRV",
-    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -80,14 +83,106 @@ CSS = """
     font-family: "Google Sans", "Roboto", Arial, sans-serif;
 }
 
-[data-testid="stHeader"] { background: transparent; }
-[data-testid="stToolbar"] { display: none; }
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+[data-testid="stToolbar"] {
+    display: none;
+}
+
+/* REMOVE COMPLETAMENTE SIDEBAR NATIVA */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* REMOVE BOTÃO NATIVO */
+button[kind="header"] {
+    display: none !important;
+}
+
+/* REMOVE ESPAÇO LATERAL */
+[data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+}
 
 .block-container {
     padding-top: 1.4rem;
     padding-bottom: 1rem;
+    padding-left: 5rem;
     max-width: 100%;
 }
+
+/* =========================
+   MENU LATERAL HOVER
+========================= */
+
+.hover-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 58px;
+    height: 100vh;
+    background: #FFFFFF;
+    border-right: 1px solid #E0E3EB;
+    box-shadow: 0 1px 2px rgba(60,64,67,.10),
+                0 2px 6px rgba(60,64,67,.08);
+    z-index: 999999999;
+    transition: width 0.25s ease;
+    overflow: hidden;
+    padding-top: 18px;
+}
+
+.hover-menu:hover {
+    width: 280px;
+}
+
+.menu-icon {
+    font-size: 24px;
+    color: #5F6368;
+    padding-left: 18px;
+    margin-bottom: 28px;
+}
+
+.menu-title {
+    opacity: 0;
+    white-space: nowrap;
+    font-size: 16px;
+    font-weight: 700;
+    color: #202124;
+    padding: 0 18px 18px 18px;
+    transition: opacity 0.2s ease;
+}
+
+.hover-menu:hover .menu-title {
+    opacity: 1;
+}
+
+.menu-item {
+    display: block;
+    opacity: 0;
+    white-space: nowrap;
+    text-decoration: none !important;
+    color: #202124 !important;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 13px 18px;
+    transition: opacity 0.2s ease,
+                background 0.2s ease;
+}
+
+.hover-menu:hover .menu-item {
+    opacity: 1;
+}
+
+.menu-item:hover {
+    background: #E8F0FE;
+    color: #1A73E8 !important;
+}
+
+/* =========================
+   RESTANTE CSS
+========================= */
 
 .hive-title {
     font-size: 30px;
@@ -95,8 +190,6 @@ CSS = """
     color: var(--md-text);
     margin-bottom: 2px;
     letter-spacing: -.2px;
-    position: relative;
-    z-index: 999;
 }
 
 .hive-subtitle {
@@ -105,19 +198,16 @@ CSS = """
     font-weight: 400;
     margin-top: 2px;
     margin-bottom: 18px;
-    position: relative;
-    z-index: 999;
 }
 
 .kpi-card {
     background: var(--md-surface);
     border: none;
     border-radius: 24px;
-    padding: 20px 20px 18px 20px;
+    padding: 20px;
     min-height: 148px;
     box-shadow: var(--md-shadow);
     margin-bottom: 18px;
-    overflow: hidden;
 }
 
 .kpi-label {
@@ -125,8 +215,6 @@ CSS = """
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .32px;
-    min-height: 32px;
 }
 
 .kpi-value {
@@ -134,19 +222,16 @@ CSS = """
     font-weight: 600;
     line-height: 1.08;
     margin-top: 8px;
-    white-space: nowrap;
 }
 
 .kpi-note {
     color: var(--md-muted);
     font-size: 11px;
-    font-weight: 400;
     margin-top: 9px;
 }
 
 .panel {
     background: var(--md-surface);
-    border: none;
     border-radius: 24px;
     padding: 20px 22px 16px 22px;
     box-shadow: var(--md-shadow);
@@ -158,48 +243,6 @@ CSS = """
     font-weight: 600;
     color: var(--md-text);
     margin-bottom: 10px;
-    letter-spacing: .1px;
-}
-
-.robot-line {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--md-text);
-}
-
-.robot-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    min-width: 12px;
-    border-radius: 50%;
-}
-
-.robot-dot.on { background: var(--md-green); }
-.robot-dot.off { background: var(--md-red); }
-
-.robot-status {
-    font-size: 12px;
-    font-weight: 600;
-    min-width: 28px;
-}
-
-.robot-status.on { color: var(--md-green); }
-.robot-status.off { color: var(--md-red); }
-
-.footer-note {
-    color: var(--md-muted);
-    font-size: 12px;
-    text-align: right;
-}
-
-[data-testid="column"] {
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
 }
 
 .chart-scroll {
@@ -211,37 +254,6 @@ CSS = """
 
 .chart-inner {
     min-width: 1600px;
-}
-
-/* DataFrames nativos do Streamlit */
-div[data-testid="stDataFrame"] {
-    border: none;
-    border-radius: 18px;
-    background: var(--md-surface);
-    box-shadow: var(--md-shadow);
-}
-
-div[data-testid="stDataFrame"] > div,
-div[data-testid="stDataFrame"] [role="table"],
-div[data-testid="stDataFrame"] .glideDataEditor,
-div[data-testid="stDataFrame"] .dvn-scroller,
-div[data-testid="stDataFrame"] .gdg-cell {
-    background: var(--md-surface) !important;
-    color: var(--md-text) !important;
-}
-
-div[data-testid="stDataFrame"] [role="columnheader"],
-div[data-testid="stDataFrame"] .gdg-header {
-    background: var(--md-surface-variant) !important;
-    color: var(--md-text) !important;
-    font-weight: 600 !important;
-    border-bottom: 1px solid var(--md-border) !important;
-}
-
-div[data-testid="stDataFrame"] [role="gridcell"] {
-    background: var(--md-surface) !important;
-    color: var(--md-text) !important;
-    border-color: var(--md-border) !important;
 }
 
 .dark-table {
@@ -266,20 +278,59 @@ div[data-testid="stDataFrame"] [role="gridcell"] {
 
 .dark-table tbody td {
     padding: 9px;
-    color: var(--md-text);
     border-bottom: 1px solid var(--md-border);
-    max-width: 520px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.dark-table tbody tr:nth-child(even) { background: #FAFAFA; }
-.dark-table tbody tr:nth-child(odd) { background: var(--md-surface); }
+.dark-table tbody tr:nth-child(even) {
+    background: #FAFAFA;
+}
+
+.dark-table tbody tr:nth-child(odd) {
+    background: var(--md-surface);
+}
+
 </style>
 """
+
 st.markdown(CSS, unsafe_allow_html=True)
 
+
+# =========================
+# MENU
+# =========================
+
+query_params = st.query_params
+
+pagina = query_params.get(
+    "pagina",
+    "Monitoramento atual"
+)
+
+menu_html = """
+<div class="hover-menu">
+
+    <div class="menu-icon">
+        ☰
+    </div>
+
+    <div class="menu-title">
+        Monitoramento
+    </div>
+
+    <a class="menu-item"
+       href="?pagina=Monitoramento atual">
+       📊 Monitoramento atual
+    </a>
+
+    <a class="menu-item"
+       href="?pagina=Histórico monitoramento">
+       📁 Histórico monitoramento
+    </a>
+
+</div>
+"""
+
+st.html(menu_html)
 
 # =========================
 # GITHUB / CACHE LOCAL
@@ -674,7 +725,7 @@ def carregar_excel(path_str: str, mtime: float):
         df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
 
     for col in df.columns:
-        if col != "Horário":
+        if col not in ("Horário", "Data/Hora", "Data"):
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
     return df
@@ -685,6 +736,78 @@ def carregar_excel_generico(path_str: str, mtime: float):
     df = pd.read_excel(path_str, engine="openpyxl")
     df = normalizar_colunas(df)
     return df
+
+
+@st.cache_data(show_spinner=False)
+def carregar_csv_historico(path_str: str, mtime: float):
+    df = pd.read_csv(path_str, sep=";", encoding="utf-8-sig")
+    df = normalizar_colunas(df)
+
+    if "Data/Hora" in df.columns:
+        df["Data/Hora"] = pd.to_datetime(
+            df["Data/Hora"],
+            dayfirst=True,
+            errors="coerce",
+        )
+        df["Data"] = df["Data/Hora"].dt.date
+
+    if "Horário" in df.columns:
+        df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
+
+    colunas_nao_numericas = {
+        "Data/Hora",
+        "Data",
+        "Horário",
+        "Tipo Histórico",
+        "Tipo Historico",
+        "Serviço",
+        "Servico",
+        "Inconsistência",
+        "Inconsistencia",
+        "Inconsistência nova no ciclo?",
+        "STOP PROCESSO ativado?",
+        "Serviços desligados",
+        "Falhas ao desligar",
+    }
+
+    for col in df.columns:
+        if col not in colunas_nao_numericas:
+            convertido = pd.to_numeric(df[col], errors="coerce")
+
+            if convertido.notna().any():
+                df[col] = convertido.fillna(0)
+
+    return df
+
+def agrupar_monitoramento_por_horario(df_base: pd.DataFrame) -> pd.DataFrame:
+    if df_base is None or df_base.empty or "Horário" not in df_base.columns:
+        return df_base
+
+    df_aux = df_base.copy()
+    df_aux["Horário"] = df_aux["Horário"].astype(str).str.slice(0, 5)
+
+    colunas_numericas = [
+        c for c in df_aux.columns
+        if c not in ("Data/Hora", "Data", "Horário")
+        and pd.api.types.is_numeric_dtype(pd.to_numeric(df_aux[c], errors="coerce"))
+    ]
+
+    if not colunas_numericas:
+        return df_aux.sort_values("Horário").reset_index(drop=True)
+
+    agg = {c: "max" for c in colunas_numericas}
+    if "Data/Hora" in df_aux.columns:
+        agg["Data/Hora"] = "last"
+    if "Data" in df_aux.columns:
+        agg["Data"] = "last"
+
+    return (
+        df_aux
+        .groupby("Horário", as_index=False)
+        .agg(agg)
+        .sort_values("Horário")
+        .reset_index(drop=True)
+    )
 
 
 def media_coluna(df_media: pd.DataFrame, coluna: str, horario: str = None):
@@ -1474,7 +1597,7 @@ try:
         df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
 
     for col in df.columns:
-        if col != "Horário":
+        if col not in ("Horário", "Data/Hora", "Data"):
             df[col] = (
                 pd.to_numeric(df[col], errors="coerce")
                 .fillna(0)
@@ -1518,6 +1641,9 @@ try:
 except Exception as e:
     st.warning(f"Historico_Criticas.xlsx ainda não disponível ou não carregado: {e}")
 
+# Evita horários duplicados após normalização do RPA.
+df = agrupar_monitoramento_por_horario(df)
+
 
 # =========================
 # DADOS PRINCIPAIS
@@ -1555,275 +1681,423 @@ total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
 robos = status_robos(df, df_criticas, df_hist)
 
 
-# =========================
-# TÍTULO
-# =========================
+if pagina == "Monitoramento atual":
+    # =========================
+    # TÍTULO
+    # =========================
 
-st.markdown(
-    f"""
-    <div class="hive-title">Monitoramento e-CRV</div>
-    <div class="hive-subtitle">
-        Última coleta: <b>{hora_coleta}</b>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# =========================
-# CARDS
-# =========================
-
-cols = st.columns(5)
-
-with cols[0]:
-    render_card(
-        "Fila Transferências",
-        fila_trf,
-        cor_saude(fila_trf, media_coluna(df_media, "Fila 2 e 3", hora_coleta), "negativo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[1]:
-    render_card(
-        "Sucesso Transferências",
-        sucesso_trf,
-        cor_saude(sucesso_trf, media_coluna(df_media, "Sucesso 2 e 3", hora_coleta), "positivo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[2]:
-    render_card(
-        "Inconsistências Transferências",
-        incons_trf,
-        cor_saude(incons_trf, media_coluna(df_media, "Inconsistência 2 e 3", hora_coleta), "negativo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[3]:
-    render_card(
-        "Automatizado",
-        automatizado,
-        cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[4]:
-    render_card(
-        "Inconsistências Críticas",
-        total_criticas_minuto,
-        cor_criticas_minuto(total_criticas_minuto),
-        "Total de críticas do minuto atual",
-    )
-
-cols = st.columns(5)
-
-with cols[0]:
-    render_card(
-        "Fila 0KM",
-        fila_0km,
-        cor_saude(fila_0km, media_coluna(df_media, "Fila 0km", hora_coleta), "negativo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[1]:
-    render_card(
-        "Sucesso 0KM",
-        sucesso_0km,
-        cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km", hora_coleta), "positivo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[2]:
-    render_card(
-        "Inconsistências 0KM",
-        incons_0km,
-        cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km", hora_coleta), "negativo"),
-        f"Último registro: {hora_coleta}",
-    )
-
-with cols[3]:
-    render_card(
-        "Total",
-        total_sucesso,
-        "#1A73E8",
-        "Sucesso Transferências + Sucesso 0KM",
-    )
-
-with cols[4]:
-    render_robos_card(robos, robo_monitoramento_online)
-
-
-# =========================
-# GRÁFICOS
-# =========================
-
-c1, c2 = st.columns(2)
-
-with c1:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-
-    st.plotly_chart(
-        line_chart(
-            df,
-            ["Sucesso 2 e 3"],
-            "Transferências - Sucesso",
-        ),
-        use_container_width=False,
-    )
-
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-
-    st.plotly_chart(
-        line_chart(
-            df,
-            ["Fila 2 e 3", "Inconsistência 2 e 3"],
-            "Transferências - Fila e Inconsistências",
-        ),
-        use_container_width=False,
-    )
-
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with c2:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-
-    st.plotly_chart(
-        line_chart(
-            df,
-            ["Sucesso 0km"],
-            "0KM - Sucesso",
-        ),
-        use_container_width=False,
-    )
-
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-
-    st.plotly_chart(
-        line_chart(
-            df,
-            ["Fila 0km", "Inconsistência 0km"],
-            "0KM - Fila e Inconsistências",
-        ),
-        use_container_width=False,
-    )
-
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# =========================
-# TABELAS DE HISTÓRICO E INCONSISTÊNCIAS
-# =========================
-
-st.markdown('<div class="panel">', unsafe_allow_html=True)
-st.markdown('<div class="panel-title">Histórico de Inconsistências Críticas</div>', unsafe_allow_html=True)
-
-if df_hist is None or df_hist.empty:
-    st.info("Histórico de críticas ainda não disponível.")
-else:
-    df_crit_minuto = tabela_historico_criticas_minuto(df_hist)
-
-    if df_crit_minuto.empty:
-        render_mensagem_tabela("Não há histórico de críticas do minuto para exibir.")
-    else:
-        # Remove valores NaN da tabela
-        df_crit_minuto = df_crit_minuto.fillna("")
-
-        # Remove colunas que não serão exibidas
-        colunas_remover = [
-            "Tipo Histórico",
-            "Tipo Historico",
-            "Serviço",
-            "Servico",
-            "Total ciclo anterior",
-            "Total Ciclo Anterior",
-            "Diferença ciclo",
-            "Diferenca ciclo",
-            "Inconsistência nova no ciclo?",
-            "Inconsistencia nova no ciclo?",
-        ]
-
-        df_crit_minuto = df_crit_minuto.drop(
-            columns=[c for c in colunas_remover if c in df_crit_minuto.columns],
-            errors="ignore"
-        )
-
-        # Limpa a descrição da inconsistência, se existir
-        #col_inc = _coluna_existente(
-        #    df_crit_minuto,
-        #    [
-        #        "Inconsistência",
-        #        "Inconsistencia",
-        #        "Descrição Inconsistência",
-        #        "Descricao Inconsistencia",
-        #    ]
-        #)
-
-        #if col_inc:
-         #   df_crit_minuto[col_inc] = df_crit_minuto[col_inc].apply(normalizar_inconsistencia)
-
-        render_tabela_escura(df_crit_minuto)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-st.markdown('<div class="panel">', unsafe_allow_html=True)
-st.markdown('<div class="panel-title">Inconsistências - Top 5 - Ciclo atual (10 min)</div>', unsafe_allow_html=True)
-
-df_top3 = tabela_top3_ciclo_atual(df_hist)
-if df_top3.empty:
-    render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
-else:
-    render_tabela_escura(df_top3)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-#st.markdown('<div class="panel">', unsafe_allow_html=True)
-#st.markdown('<div class="panel-title">Tabela de Inconsistências Novas</div>', unsafe_allow_html=True)
-
-#df_novas = tabela_inconsistencias_desconhecidas(df_hist)
-#if df_novas.empty:
-#    render_mensagem_tabela("Não foram encontradas inconsistências desconhecidas.")
-#else:
-#    render_tabela_escura(df_novas)
-#
-#st.markdown("</div>", unsafe_allow_html=True)
-
-
-st.markdown('<div class="panel">', unsafe_allow_html=True)
-st.markdown('<div class="panel-title">Histórico Total de Inconsistências por Serviço</div>', unsafe_allow_html=True)
-
-servicos_tabelas = [
-    ("Primeiro Registro / 0KM", "0KM"),
-    ("Transferências", "Transferências"),
-]
-
-for titulo_servico, chave_servico in servicos_tabelas:
     st.markdown(
-        f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
+        f"""
+        <div class="hive-title">Monitoramento e-CRV</div>
+        <div class="hive-subtitle">
+            Última coleta: <b>{hora_coleta}</b>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    df_serv = tabela_historico_servico(df_hist, chave_servico)
-    if df_serv.empty:
-        render_mensagem_tabela("Sem histórico de inconsistências registrado para este serviço.")
+
+
+    # =========================
+    # CARDS
+    # =========================
+
+    cols = st.columns(5)
+
+    with cols[0]:
+        render_card(
+            "Fila Transferências",
+            fila_trf,
+            cor_saude(fila_trf, media_coluna(df_media, "Fila 2 e 3", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[1]:
+        render_card(
+            "Sucesso Transferências",
+            sucesso_trf,
+            cor_saude(sucesso_trf, media_coluna(df_media, "Sucesso 2 e 3", hora_coleta), "positivo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[2]:
+        render_card(
+            "Inconsistências Transferências",
+            incons_trf,
+            cor_saude(incons_trf, media_coluna(df_media, "Inconsistência 2 e 3", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[3]:
+        render_card(
+            "Automatizado",
+            automatizado,
+            cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[4]:
+        render_card(
+            "Inconsistências Críticas",
+            total_criticas_minuto,
+            cor_criticas_minuto(total_criticas_minuto),
+            "Total de críticas do minuto atual",
+        )
+
+    cols = st.columns(5)
+
+    with cols[0]:
+        render_card(
+            "Fila 0KM",
+            fila_0km,
+            cor_saude(fila_0km, media_coluna(df_media, "Fila 0km", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[1]:
+        render_card(
+            "Sucesso 0KM",
+            sucesso_0km,
+            cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km", hora_coleta), "positivo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[2]:
+        render_card(
+            "Inconsistências 0KM",
+            incons_0km,
+            cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+
+    with cols[3]:
+        render_card(
+            "Total",
+            total_sucesso,
+            "#1A73E8",
+            "Sucesso Transferências + Sucesso 0KM",
+        )
+
+    with cols[4]:
+        render_robos_card(robos, robo_monitoramento_online)
+
+
+    # =========================
+    # GRÁFICOS
+    # =========================
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Sucesso 2 e 3"],
+                "Transferências - Sucesso",
+            ),
+            use_container_width=False,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Fila 2 e 3", "Inconsistência 2 e 3"],
+                "Transferências - Fila e Inconsistências",
+            ),
+            use_container_width=False,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c2:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Sucesso 0km"],
+                "0KM - Sucesso",
+            ),
+            use_container_width=False,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Fila 0km", "Inconsistência 0km"],
+                "0KM - Fila e Inconsistências",
+            ),
+            use_container_width=False,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+    # =========================
+    # TABELAS DE HISTÓRICO E INCONSISTÊNCIAS
+    # =========================
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Histórico de Inconsistências Críticas</div>', unsafe_allow_html=True)
+
+    if df_hist is None or df_hist.empty:
+        st.info("Histórico de críticas ainda não disponível.")
     else:
-        render_tabela_escura(df_serv)
+        df_crit_minuto = tabela_historico_criticas_minuto(df_hist)
 
-st.markdown("</div>", unsafe_allow_html=True)
+        if df_crit_minuto.empty:
+            render_mensagem_tabela("Não há histórico de críticas do minuto para exibir.")
+        else:
+            # Remove valores NaN da tabela
+            df_crit_minuto = df_crit_minuto.fillna("")
 
+            # Remove colunas que não serão exibidas
+            colunas_remover = [
+                "Tipo Histórico",
+                "Tipo Historico",
+                "Serviço",
+                "Servico",
+                "Total ciclo anterior",
+                "Total Ciclo Anterior",
+                "Diferença ciclo",
+                "Diferenca ciclo",
+                "Inconsistência nova no ciclo?",
+                "Inconsistencia nova no ciclo?",
+            ]
+
+            df_crit_minuto = df_crit_minuto.drop(
+                columns=[c for c in colunas_remover if c in df_crit_minuto.columns],
+                errors="ignore"
+            )
+
+            # Limpa a descrição da inconsistência, se existir
+            #col_inc = _coluna_existente(
+            #    df_crit_minuto,
+            #    [
+            #        "Inconsistência",
+            #        "Inconsistencia",
+            #        "Descrição Inconsistência",
+            #        "Descricao Inconsistencia",
+            #    ]
+            #)
+
+            #if col_inc:
+             #   df_crit_minuto[col_inc] = df_crit_minuto[col_inc].apply(normalizar_inconsistencia)
+
+            render_tabela_escura(df_crit_minuto)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Inconsistências - Top 5 - Ciclo atual (10 min)</div>', unsafe_allow_html=True)
+
+    df_top3 = tabela_top3_ciclo_atual(df_hist)
+    if df_top3.empty:
+        render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
+    else:
+        render_tabela_escura(df_top3)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+    #st.markdown('<div class="panel">', unsafe_allow_html=True)
+    #st.markdown('<div class="panel-title">Tabela de Inconsistências Novas</div>', unsafe_allow_html=True)
+
+    #df_novas = tabela_inconsistencias_desconhecidas(df_hist)
+    #if df_novas.empty:
+    #    render_mensagem_tabela("Não foram encontradas inconsistências desconhecidas.")
+    #else:
+    #    render_tabela_escura(df_novas)
+    #
+    #st.markdown("</div>", unsafe_allow_html=True)
+
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Histórico Total de Inconsistências por Serviço</div>', unsafe_allow_html=True)
+
+    servicos_tabelas = [
+        ("Primeiro Registro / 0KM", "0KM"),
+        ("Transferências", "Transferências"),
+    ]
+
+    for titulo_servico, chave_servico in servicos_tabelas:
+        st.markdown(
+            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            unsafe_allow_html=True,
+        )
+        df_serv = tabela_historico_servico(df_hist, chave_servico)
+        if df_serv.empty:
+            render_mensagem_tabela("Sem histórico de inconsistências registrado para este serviço.")
+        else:
+            render_tabela_escura(df_serv)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+
+
+
+elif pagina == "Histórico monitoramento":
+    st.markdown(
+        """
+        <div class="hive-title">Histórico monitoramento</div>
+        <div class="hive-subtitle">
+            Selecione uma data para consultar a tabela, os gráficos e o histórico de inconsistências.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    try:
+        caminho_mon_hist, _ = baixar_github_se_houver_alteracao(
+            GITHUB_ARQ_MONITORAMENTO_HIST,
+            ARQ_LOCAL_MONITORAMENTO_HIST,
+            obrigatorio=True,
+        )
+
+        df_mon_hist = carregar_csv_historico(
+            str(caminho_mon_hist),
+            Path(caminho_mon_hist).stat().st_mtime,
+        )
+
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico mensal de monitoramento: {e}")
+        st.stop()
+
+    try:
+        caminho_inc_hist, _ = baixar_github_se_houver_alteracao(
+            GITHUB_ARQ_INCONSISTENCIAS_HIST,
+            ARQ_LOCAL_INCONSISTENCIAS_HIST,
+            obrigatorio=False,
+        )
+
+        if caminho_inc_hist and Path(caminho_inc_hist).exists():
+            df_inc_hist = carregar_csv_historico(
+                str(caminho_inc_hist),
+                Path(caminho_inc_hist).stat().st_mtime,
+            )
+        else:
+            df_inc_hist = pd.DataFrame()
+
+    except Exception:
+        df_inc_hist = pd.DataFrame()
+
+    if df_mon_hist.empty or "Data" not in df_mon_hist.columns:
+        st.error("O histórico de monitoramento não possui registros com Data/Hora válida.")
+        st.stop()
+
+    datas_disponiveis = sorted(df_mon_hist["Data"].dropna().unique(), reverse=True)
+
+    if not datas_disponiveis:
+        st.error("Nenhuma data disponível no histórico de monitoramento.")
+        st.stop()
+
+    data_selecionada = st.date_input(
+        "Selecionar data",
+        value=datas_disponiveis[0],
+        min_value=min(datas_disponiveis),
+        max_value=max(datas_disponiveis),
+    )
+
+    df_dia = df_mon_hist[df_mon_hist["Data"] == data_selecionada].copy()
+    df_dia = agrupar_monitoramento_por_horario(df_dia)
+
+    if df_inc_hist is not None and not df_inc_hist.empty and "Data" in df_inc_hist.columns:
+        df_hist_dia = df_inc_hist[df_inc_hist["Data"] == data_selecionada].copy()
+    else:
+        df_hist_dia = pd.DataFrame()
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Tabela de monitoramento da data selecionada</div>', unsafe_allow_html=True)
+
+    if df_dia.empty:
+        render_mensagem_tabela("Não há registros de monitoramento para a data selecionada.")
+    else:
+        colunas_exibir = [c for c in df_dia.columns if c != "Data"]
+        st.dataframe(df_dia[colunas_exibir], use_container_width=True, hide_index=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+    st.plotly_chart(
+        line_chart(
+            df_dia,
+            ["Sucesso 2 e 3", "Fila 2 e 3", "Inconsistência 2 e 3"],
+            "Transferências - Histórico do dia",
+        ),
+        use_container_width=False,
+    )
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+    st.plotly_chart(
+        line_chart(
+            df_dia,
+            ["Sucesso 0km", "Fila 0km", "Inconsistência 0km"],
+            "0KM - Histórico do dia",
+        ),
+        use_container_width=False,
+    )
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Histórico de críticas da data selecionada</div>', unsafe_allow_html=True)
+
+    if df_hist_dia.empty:
+        render_mensagem_tabela("Não há histórico de críticas para a data selecionada.")
+    else:
+        df_crit_minuto = tabela_historico_criticas_minuto(df_hist_dia)
+        if df_crit_minuto.empty:
+            render_mensagem_tabela("Não há críticas do minuto para a data selecionada.")
+        else:
+            render_tabela_escura(df_crit_minuto.fillna(""))
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Histórico total de inconsistências por serviço</div>', unsafe_allow_html=True)
+
+    for titulo_servico, chave_servico in [
+        ("Primeiro Registro / 0KM", "0KM"),
+        ("Transferências", "Transferências"),
+    ]:
+        st.markdown(
+            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            unsafe_allow_html=True,
+        )
+
+        if df_hist_dia.empty:
+            render_mensagem_tabela("Sem histórico de inconsistências para esta data.")
+        else:
+            df_serv = tabela_historico_servico(df_hist_dia, chave_servico)
+            if df_serv.empty:
+                render_mensagem_tabela("Sem histórico de inconsistências para este serviço na data selecionada.")
+            else:
+                render_tabela_escura(df_serv.fillna(""))
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================
 # RODAPÉ / AUTO REFRESH
