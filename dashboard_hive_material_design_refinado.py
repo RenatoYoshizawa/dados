@@ -1555,8 +1555,13 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         "inconsistência" in colunas_lower or "inconsistencia" in colunas_lower
     ):
         classe_extra = " tabela-criticas"
-    elif "descrição" in colunas_lower or "descricao" in colunas_lower:
-        classe_extra = " tabela-descricao"
+
+
+    elif (
+        ("descrição" in colunas_lower or "descricao" in colunas_lower)
+        and "%" in colunas_lower
+    ):
+    classe_extra = " tabela-descricao"
     else:
         classe_extra = ""
 
