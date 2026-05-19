@@ -2065,7 +2065,7 @@ elif pagina == "Histórico monitoramento":
 
 df_tabela = df_dia[colunas_exibir].copy().fillna("")
 
-render_tabela_escura(df_tabela)
+    render_tabela_escura(df_tabela)
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
