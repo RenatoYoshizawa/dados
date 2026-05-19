@@ -740,8 +740,20 @@ def carregar_excel_generico(path_str: str, mtime: float):
 
 @st.cache_data(show_spinner=False)
 def carregar_csv_historico(path_str: str, mtime: float):
-    df = pd.read_csv(path_str, sep=";", encoding="utf-8-sig")
+    # Leitura robusta para CSV separado por ; ou ,
+    try:
+        df = pd.read_csv(path_str, sep=";", encoding="utf-8-sig")
+    except Exception:
+        df = pd.read_csv(path_str, sep=",", encoding="utf-8-sig")
+
     df = normalizar_colunas(df)
+
+    # Se o CSV entrou como uma única coluna contendo ;
+    if len(df.columns) == 1 and ";" in str(df.columns[0]):
+        df = pd.read_csv(path_str, sep=";", encoding="utf-8-sig")
+        df = normalizar_colunas(df)
+
+    df.columns = [str(c).strip() for c in df.columns]
 
     if "Data/Hora" in df.columns:
         df["Data/Hora"] = pd.to_datetime(
@@ -773,7 +785,6 @@ def carregar_csv_historico(path_str: str, mtime: float):
     for col in df.columns:
         if col not in colunas_nao_numericas:
             convertido = pd.to_numeric(df[col], errors="coerce")
-
             if convertido.notna().any():
                 df[col] = convertido.fillna(0)
 
@@ -2031,8 +2042,21 @@ elif pagina == "Histórico monitoramento":
     if df_dia.empty:
         render_mensagem_tabela("Não há registros de monitoramento para a data selecionada.")
     else:
-        colunas_exibir = [c for c in df_dia.columns if c != "Data"]
-        st.dataframe(df_dia[colunas_exibir], use_container_width=True, hide_index=True)
+        colunas_ocultar = {
+            "Data",
+            "Data/Hora",
+        }
+        
+        colunas_exibir = [
+            c for c in df_dia.columns
+            if c not in colunas_ocultar
+        ]
+        
+        st.dataframe(
+            df_dia[colunas_exibir],
+            use_container_width=True,
+            hide_index=True
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
