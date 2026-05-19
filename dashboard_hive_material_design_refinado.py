@@ -212,7 +212,7 @@ button[kind="header"] {
 
 .kpi-label {
     color: var(--md-muted);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -291,22 +291,57 @@ button[kind="header"] {
     height: auto !important;
 }
 
-/* Tabelas de 3 colunas: Data/Hora | Inconsistência | Total */
-.dark-table.tabela-3col th:nth-child(1),
-.dark-table.tabela-3col td:nth-child(1) {
-    width: 190px;
-    max-width: 190px;
+/* Histórico de críticas: Data/Hora | Inconsistência | Total */
+.dark-table.tabela-criticas {
+    table-layout: fixed;
+}
+
+.dark-table.tabela-criticas th:nth-child(1),
+.dark-table.tabela-criticas td:nth-child(1) {
+    width: 180px;
+    max-width: 180px;
     white-space: nowrap;
 }
 
-.dark-table.tabela-3col th:nth-child(2),
-.dark-table.tabela-3col td:nth-child(2) {
+.dark-table.tabela-criticas th:nth-child(2),
+.dark-table.tabela-criticas td:nth-child(2) {
     width: auto;
-    min-width: 420px;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
 }
 
-.dark-table.tabela-3col th:nth-child(3),
-.dark-table.tabela-3col td:nth-child(3) {
+.dark-table.tabela-criticas th:nth-child(3),
+.dark-table.tabela-criticas td:nth-child(3) {
+    width: 140px;
+    max-width: 140px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Histórico por serviço: Descrição | Total | % */
+.dark-table.tabela-descricao {
+    table-layout: fixed;
+}
+
+.dark-table.tabela-descricao th:nth-child(1),
+.dark-table.tabela-descricao td:nth-child(1) {
+    width: auto;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.dark-table.tabela-descricao th:nth-child(2),
+.dark-table.tabela-descricao td:nth-child(2) {
+    width: 120px;
+    max-width: 120px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.dark-table.tabela-descricao th:nth-child(3),
+.dark-table.tabela-descricao td:nth-child(3) {
     width: 120px;
     max-width: 120px;
     text-align: center;
@@ -1514,7 +1549,16 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         except Exception:
             pass
 
-    classe_extra = " tabela-3col" if len(df_tabela.columns) == 3 else ""
+    colunas_lower = [str(c).strip().lower() for c in df_tabela.columns]
+
+    if "data/hora" in colunas_lower and (
+        "inconsistência" in colunas_lower or "inconsistencia" in colunas_lower
+    ):
+        classe_extra = " tabela-criticas"
+    elif "descrição" in colunas_lower or "descricao" in colunas_lower:
+        classe_extra = " tabela-descricao"
+    else:
+        classe_extra = ""
 
     html = df_tabela.to_html(index=False, escape=False)
 
