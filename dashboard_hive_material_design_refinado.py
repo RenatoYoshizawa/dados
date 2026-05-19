@@ -253,7 +253,7 @@ button[kind="header"] {
 }
 
 .chart-inner {
-    min-width: 1250px;
+    min-width: 100%;
 }
 
 .dark-table {
@@ -348,23 +348,25 @@ button[kind="header"] {
     white-space: nowrap;
 }
 
-/* Scroll para tabelas extensas */
+/* Scroll para tabela de monitoramento */
 .table-scroll {
     max-height: 420px;
     overflow-y: auto;
     overflow-x: auto;
     border-radius: 18px;
     box-shadow: var(--md-shadow);
+    margin-top: 6px;
 }
 
 .table-scroll table {
     box-shadow: none !important;
+    margin-bottom: 0 !important;
 }
 
 .table-scroll thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 10;
 }
 
 
@@ -1368,7 +1370,7 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
 def fig_layout(fig, height=520):
     fig.update_layout(
         height=height,
-        width=1250,
+        autosize=True,
         margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#FFFFFF",
@@ -1537,6 +1539,91 @@ def quebrar_texto_longo(valor, limite=120):
     return "<br>".join(partes)
 
 
+def extrair_mensagem_inconsistencia(valor):
+    texto = str(valor or "").strip()
+
+    if not texto:
+        return ""
+
+    try:
+        obj = json.loads(texto)
+        if isinstance(obj, dict):
+            return str(
+                obj.get("mensagem")
+                or obj.get("ERRORMESSAGE")
+                or obj.get("WEBERRORMESSAGE")
+                or texto
+            ).strip()
+    except Exception:
+        pass
+
+    texto_upper = texto.upper()
+    for chave in ["ERRORMESSAGE", "WEBERRORMESSAGE", "MENSAGEM"]:
+        pos = texto_upper.find(chave)
+        if pos >= 0:
+            recorte = texto[pos + len(chave):]
+            recorte = recorte.replace('":', " ").replace('";', " ")
+            recorte = recorte.replace('"', " ").replace("}", " ")
+            recorte = " ".join(recorte.split())
+            if recorte:
+                return recorte
+
+    return texto
+
+
+def quebrar_texto_longo(valor, limite=120):
+    texto = extrair_mensagem_inconsistencia(valor)
+
+    if len(texto) <= limite:
+        return texto
+
+    partes = []
+    atual = ""
+
+    for pedaco in texto.split(" "):
+        if len(atual) + len(pedaco) + 1 > limite:
+            partes.append(atual.strip())
+            atual = pedaco
+        else:
+            atual += " " + pedaco
+
+    if atual.strip():
+        partes.append(atual.strip())
+
+    return "<br>".join(partes)
+
+
+def formatar_valor_tabela(valor):
+    try:
+        if pd.isna(valor):
+            return ""
+    except Exception:
+        pass
+
+    texto = str(valor).strip()
+
+    if texto == "":
+        return ""
+
+    # Remove .0 de números inteiros em formato texto: 3393.0 -> 3393
+    if re.fullmatch(r"-?\d+\.0+", texto):
+        return texto.split(".")[0]
+
+    # Remove .0 mesmo quando vier com espaços
+    if texto.endswith(".0"):
+        base = texto[:-2]
+        if re.fullmatch(r"-?\d+", base):
+            return base
+
+    # Converte números: 46.0 -> 46 | 0.13 -> 0,13
+    try:
+        numero = float(texto.replace(",", "."))
+        if numero.is_integer():
+            return str(int(numero))
+        return str(round(numero, 2)).replace(".", ",")
+    except Exception:
+        return texto
+
 def render_tabela_escura(df_tabela: pd.DataFrame):
 
     df_tabela = df_tabela.copy()
@@ -1552,22 +1639,11 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
             or "retorno" in nome_col
             or "inconsist" in nome_col
         ):
-            df_tabela[col] = df_tabela[col].apply(lambda x: quebrar_texto_longo(x, limite=90))
+            df_tabela[col] = df_tabela[col].apply(lambda x: formatar_valor_tabela(quebrar_texto_longo(x, limite=120)))
             continue
 
-        try:
-            serie = pd.to_numeric(df_tabela[col], errors="coerce")
-
-            if serie.notna().any():
-
-                df_tabela[col] = serie.apply(
-                    lambda x: "" if pd.isna(x)
-                    else str(int(x)) if float(x).is_integer()
-                    else str(round(float(x), 2)).replace(".", ",")
-                )
-
-        except Exception:
-            pass
+        # Formata coluna numérica ou valores numéricos isolados, removendo .0.
+        df_tabela[col] = df_tabela[col].apply(formatar_valor_tabela)
 
     colunas_lower = [str(c).strip().lower() for c in df_tabela.columns]
 
@@ -1575,7 +1651,11 @@ def render_tabela_escura(df_tabela: pd.DataFrame):
         "inconsistência" in colunas_lower or "inconsistencia" in colunas_lower
     ):
         classe_extra = " tabela-criticas"
-    elif "descrição" in colunas_lower or "descricao" in colunas_lower:
+    elif (
+        ("descrição" in colunas_lower or "descricao" in colunas_lower)
+        and "total" in colunas_lower
+        and "%" in colunas_lower
+    ):
         classe_extra = " tabela-descricao"
     else:
         classe_extra = ""
@@ -2030,7 +2110,7 @@ if pagina == "Monitoramento atual":
                 ["Sucesso 2 e 3"],
                 "Transferências - Sucesso",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
 
         st.markdown('</div></div>', unsafe_allow_html=True)
@@ -2045,7 +2125,7 @@ if pagina == "Monitoramento atual":
                 ["Fila 2 e 3", "Inconsistência 2 e 3"],
                 "Transferências - Fila e Inconsistências",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
 
         st.markdown('</div></div>', unsafe_allow_html=True)
@@ -2061,7 +2141,7 @@ if pagina == "Monitoramento atual":
                 ["Sucesso 0km"],
                 "0KM - Sucesso",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
 
         st.markdown('</div></div>', unsafe_allow_html=True)
@@ -2076,7 +2156,7 @@ if pagina == "Monitoramento atual":
                 ["Fila 0km", "Inconsistência 0km"],
                 "0KM - Fila e Inconsistências",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
 
         st.markdown('</div></div>', unsafe_allow_html=True)
@@ -2310,7 +2390,7 @@ elif pagina == "Histórico monitoramento":
                 ["Sucesso 2 e 3", "Fila 2 e 3", "Inconsistência 2 e 3"],
                 "Transferências - Histórico do dia",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
         st.markdown('</div></div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -2323,7 +2403,7 @@ elif pagina == "Histórico monitoramento":
                 ["Sucesso 0km", "Fila 0km", "Inconsistência 0km"],
                 "0KM - Histórico do dia",
             ),
-            use_container_width=False,
+            use_container_width=True,
         )
         st.markdown('</div></div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
