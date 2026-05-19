@@ -1427,6 +1427,31 @@ def render_mensagem_tabela(texto: str):
         unsafe_allow_html=True,
     )
 
+
+def normalizar_coluna_data_para_date(df_base: pd.DataFrame) -> pd.DataFrame:
+    """Garante que a coluna Data esteja sempre em formato date, evitando falha no filtro da tela Histórico."""
+    if df_base is None or df_base.empty:
+        return pd.DataFrame() if df_base is None else df_base
+
+    df_base = df_base.copy()
+
+    if "Data/Hora" in df_base.columns:
+        df_base["Data/Hora"] = pd.to_datetime(
+            df_base["Data/Hora"],
+            dayfirst=True,
+            errors="coerce",
+        )
+        df_base["Data"] = df_base["Data/Hora"].dt.date
+
+    elif "Data" in df_base.columns:
+        df_base["Data"] = pd.to_datetime(
+            df_base["Data"],
+            dayfirst=True,
+            errors="coerce",
+        ).dt.date
+
+    return df_base
+
 def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
     dfh = _df_historico_full_ultimo_ciclo(df_hist)
     if dfh.empty:
@@ -2008,12 +2033,14 @@ elif pagina == "Histórico monitoramento":
             Path(caminho_mon_hist).stat().st_mtime,
         )
 
+        df_mon_hist = normalizar_coluna_data_para_date(df_mon_hist)
+
     except Exception as e:
         st.error(f"Erro ao carregar histórico mensal de monitoramento: {e}")
         st.stop()
 
     try:
-        caminho_inc_hist, _ = baixar_github_se_houver_alteracao(
+        caminho_inc_hist, meta_inc_hist = baixar_github_se_houver_alteracao(
             GITHUB_ARQ_INCONSISTENCIAS_HIST,
             ARQ_LOCAL_INCONSISTENCIAS_HIST,
             obrigatorio=False,
@@ -2024,20 +2051,32 @@ elif pagina == "Histórico monitoramento":
                 str(caminho_inc_hist),
                 Path(caminho_inc_hist).stat().st_mtime,
             )
+            df_inc_hist = normalizar_coluna_data_para_date(df_inc_hist)
         else:
             df_inc_hist = pd.DataFrame()
 
-    except Exception:
+    except Exception as e:
         df_inc_hist = pd.DataFrame()
+        st.warning(f"Histórico de inconsistências não carregado: {e}")
 
     if df_mon_hist.empty or "Data" not in df_mon_hist.columns:
         st.error("O histórico de monitoramento não possui registros com Data/Hora válida.")
         st.stop()
 
-    datas_disponiveis = sorted(df_mon_hist["Data"].dropna().unique(), reverse=True)
+    datas_monitoramento = set(df_mon_hist["Data"].dropna().unique())
+
+    if df_inc_hist is not None and not df_inc_hist.empty and "Data" in df_inc_hist.columns:
+        datas_inconsistencias = set(df_inc_hist["Data"].dropna().unique())
+    else:
+        datas_inconsistencias = set()
+
+    datas_disponiveis = sorted(
+        datas_monitoramento.union(datas_inconsistencias),
+        reverse=True,
+    )
 
     if not datas_disponiveis:
-        st.error("Nenhuma data disponível no histórico de monitoramento.")
+        st.error("Nenhuma data disponível no histórico.")
         st.stop()
 
     data_selecionada = st.date_input(
@@ -2047,11 +2086,13 @@ elif pagina == "Histórico monitoramento":
         max_value=max(datas_disponiveis),
     )
 
-    df_dia = df_mon_hist[df_mon_hist["Data"] == data_selecionada].copy()
+    data_ref = pd.to_datetime(data_selecionada, errors="coerce").date()
+
+    df_dia = df_mon_hist[df_mon_hist["Data"] == data_ref].copy()
     df_dia = agrupar_monitoramento_por_horario(df_dia)
 
     if df_inc_hist is not None and not df_inc_hist.empty and "Data" in df_inc_hist.columns:
-        df_hist_dia = df_inc_hist[df_inc_hist["Data"] == data_selecionada].copy()
+        df_hist_dia = df_inc_hist[df_inc_hist["Data"] == data_ref].copy()
     else:
         df_hist_dia = pd.DataFrame()
 
@@ -2080,31 +2121,32 @@ elif pagina == "Histórico monitoramento":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-    st.plotly_chart(
-        line_chart(
-            df_dia,
-            ["Sucesso 2 e 3", "Fila 2 e 3", "Inconsistência 2 e 3"],
-            "Transferências - Histórico do dia",
-        ),
-        use_container_width=False,
-    )
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    if not df_dia.empty:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+        st.plotly_chart(
+            line_chart(
+                df_dia,
+                ["Sucesso 2 e 3", "Fila 2 e 3", "Inconsistência 2 e 3"],
+                "Transferências - Histórico do dia",
+            ),
+            use_container_width=False,
+        )
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
-    st.plotly_chart(
-        line_chart(
-            df_dia,
-            ["Sucesso 0km", "Fila 0km", "Inconsistência 0km"],
-            "0KM - Histórico do dia",
-        ),
-        use_container_width=False,
-    )
-    st.markdown('</div></div>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+        st.plotly_chart(
+            line_chart(
+                df_dia,
+                ["Sucesso 0km", "Fila 0km", "Inconsistência 0km"],
+                "0KM - Histórico do dia",
+            ),
+            use_container_width=False,
+        )
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Histórico de críticas da data selecionada</div>', unsafe_allow_html=True)
@@ -2116,7 +2158,27 @@ elif pagina == "Histórico monitoramento":
         if df_crit_minuto.empty:
             render_mensagem_tabela("Não há críticas do minuto para a data selecionada.")
         else:
-            render_tabela_escura(df_crit_minuto.fillna(""))
+            colunas_ocultar_crit = [
+                c for c in [
+                    "Data",
+                    "Tipo Histórico",
+                    "Tipo Historico",
+                    "Serviço",
+                    "Servico",
+                    "Total ciclo anterior",
+                    "Diferença ciclo",
+                    "Inconsistência nova no ciclo?",
+                ]
+                if c in df_crit_minuto.columns
+            ]
+
+            df_crit_minuto_exibir = (
+                df_crit_minuto
+                .drop(columns=colunas_ocultar_crit, errors="ignore")
+                .fillna("")
+            )
+
+            render_tabela_escura(df_crit_minuto_exibir)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
