@@ -1912,7 +1912,7 @@ if pagina == "Monitoramento atual":
             #if col_inc:
              #   df_crit_minuto[col_inc] = df_crit_minuto[col_inc].apply(normalizar_inconsistencia)
 
-            render_tabela_escura(df_crit_minuto)
+    render_tabela_escura(df_crit_minuto)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
