@@ -1382,6 +1382,25 @@ def line_chart(df, cols, title):
     return fig_layout(fig)
 
 def render_tabela_escura(df_tabela: pd.DataFrame):
+
+    df_tabela = df_tabela.copy()
+
+    for col in df_tabela.columns:
+
+        try:
+            serie = pd.to_numeric(df_tabela[col], errors="coerce")
+
+            if serie.notna().any():
+
+                df_tabela[col] = serie.apply(
+                    lambda x: "" if pd.isna(x)
+                    else str(int(x)) if float(x).is_integer()
+                    else str(round(float(x), 2)).replace(".", ",")
+                )
+
+        except Exception:
+            pass
+
     html = df_tabela.to_html(index=False, escape=False)
 
     html = html.replace(
