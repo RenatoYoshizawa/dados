@@ -874,6 +874,7 @@ def carregar_csv_historico(path_str: str, mtime: float):
             df["Data/Hora"],
             dayfirst=True,
             errors="coerce",
+            format="mixed",
         )
         df["Data"] = df["Data/Hora"].dt.date
 
@@ -1751,6 +1752,7 @@ def normalizar_coluna_data_para_date(df_base: pd.DataFrame) -> pd.DataFrame:
             df_base["Data/Hora"],
             dayfirst=True,
             errors="coerce",
+            format="mixed",
         )
         df_base["Data"] = df_base["Data/Hora"].dt.date
 
