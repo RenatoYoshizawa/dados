@@ -1928,21 +1928,87 @@ def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.Da
     })
 
 
-def tabela_historico_criticas_minuto(df_hist: pd.DataFrame) -> pd.DataFrame:
+def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
+
     if df_hist is None or df_hist.empty:
         return pd.DataFrame()
 
     dfh = df_hist.copy()
-    col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
+
+    col_tipo = _coluna_existente(
+        dfh,
+        ["Tipo Histórico", "Tipo Historico"]
+    )
+
+    col_servico = _coluna_existente(
+        dfh,
+        ["Serviço", "Servico"]
+    )
+
+    filtro = pd.Series(False, index=dfh.index)
+
     if col_tipo:
-        filtro = dfh[col_tipo].astype(str).str.upper().str.contains("CR", na=False)
-        filtro &= dfh[col_tipo].astype(str).str.upper().str.contains("MINUTO", na=False)
-        dfh = dfh[filtro].copy()
+
+        tipo = (
+            dfh[col_tipo]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+        )
+
+        filtro |= (
+            tipo.str.contains("CR", na=False)
+            &
+            tipo.str.contains("MINUTO", na=False)
+        )
+
+        # NOVO → aceita histórico diário
+        filtro |= (
+            tipo.str.contains("INCONSIST", na=False)
+            &
+            tipo.str.contains("DIA", na=False)
+        )
+
+    if col_servico:
+
+        serv = (
+            dfh[col_servico]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+        )
+
+        filtro |= (
+            serv.str.contains("CR", na=False)
+            &
+            serv.str.contains("MINUTO", na=False)
+        )
+
+    dfh = dfh[filtro].copy()
 
     if dfh.empty:
         return pd.DataFrame()
 
-    return dfh.tail(20).sort_index(ascending=False)
+    col_data = _coluna_existente(
+        dfh,
+        ["Data/Hora", "Data Hora", "Data"]
+    )
+
+    if col_data:
+
+        dfh["_ordem"] = pd.to_datetime(
+            dfh[col_data],
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        dfh = (
+            dfh
+            .sort_values("_ordem", ascending=False)
+            .drop(columns="_ordem")
+        )
+
+    return dfh.head(50)
 
 # =========================
 # LEITURA DOS ARQUIVOS
