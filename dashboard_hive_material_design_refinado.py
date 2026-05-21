@@ -1938,24 +1938,26 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
     col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
     col_servico = _coluna_existente(dfh, ["Serviço", "Servico"])
 
+    def normalizar_txt(v):
+        txt = str(v or "").upper().strip()
+        txt = unicodedata.normalize("NFKD", txt)
+        txt = "".join(c for c in txt if not unicodedata.combining(c))
+        return txt
+
     filtro = pd.Series(False, index=dfh.index)
 
     if col_tipo:
-        tipo = dfh[col_tipo].astype(str).str.upper().str.strip()
-
+        tipo = dfh[col_tipo].apply(normalizar_txt)
         filtro |= (
-            tipo.str.contains("CR", na=False)
-            &
-            tipo.str.contains("MINUTO", na=False)
+            tipo.str.contains("CRITICA", na=False)
+            & tipo.str.contains("MINUTO", na=False)
         )
 
     if col_servico:
-        serv = dfh[col_servico].astype(str).str.upper().str.strip()
-
+        servico = dfh[col_servico].apply(normalizar_txt)
         filtro |= (
-            serv.str.contains("CR", na=False)
-            &
-            serv.str.contains("MINUTO", na=False)
+            servico.str.contains("CRITICA", na=False)
+            & servico.str.contains("MINUTO", na=False)
         )
 
     dfh = dfh[filtro].copy()
@@ -1966,8 +1968,13 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
     col_data = _coluna_existente(dfh, ["Data/Hora", "Data Hora", "Data"])
 
     if col_data:
-        dfh["_ordem"] = pd.to_datetime(dfh[col_data], dayfirst=True, errors="coerce")
-        dfh = dfh.sort_values("_ordem", ascending=False).drop(columns="_ordem")
+        dfh["_ordem"] = pd.to_datetime(
+            dfh[col_data],
+            dayfirst=True,
+            errors="coerce"
+        )
+        dfh = dfh.sort_values("_ordem", ascending=False)
+        dfh = dfh.drop(columns=["_ordem"], errors="ignore")
 
     return dfh.head(50)
 
