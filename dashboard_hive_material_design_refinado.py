@@ -1080,20 +1080,58 @@ def _coluna_existente(df: pd.DataFrame, alternativas: list[str]) -> str | None:
     return None
 
 
-def _df_historico_full(df_hist: pd.DataFrame) -> pd.DataFrame:
-    """Retorna apenas as linhas do ciclo FULL de inconsistências por serviço."""
+def _df_historico_full(df_hist: pd.DataFrame):
+    """
+    Retorna linhas de inconsistências por serviço,
+    aceitando padrão antigo FULL e novo INCONSISTÊNCIA_DIA.
+    """
+
     if df_hist is None or df_hist.empty:
         return pd.DataFrame()
 
     dfh = df_hist.copy()
-    col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
+
+    col_tipo = _coluna_existente(
+        dfh,
+        ["Tipo Histórico", "Tipo Historico"]
+    )
+
     if col_tipo:
-        filtro = dfh[col_tipo].astype(str).str.upper().str.contains("INCONSIST", na=False)
-        filtro &= dfh[col_tipo].astype(str).str.upper().str.contains("FULL", na=False)
+
+        tipo = (
+            dfh[col_tipo]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+        )
+
+        filtro = (
+            tipo.str.contains("INCONSIST", na=False)
+            &
+            (
+                tipo.str.contains("FULL", na=False)
+                |
+                tipo.str.contains("DIA", na=False)
+            )
+        )
+
         dfh = dfh[filtro].copy()
 
-    col_servico = _coluna_existente(dfh, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
-    col_inc = _coluna_existente(dfh, ["Inconsistência", "Inconsistencia", "Descrição Inconsistência", "Descricao Inconsistencia"])
+    col_servico = _coluna_existente(
+        dfh,
+        ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"]
+    )
+
+    col_inc = _coluna_existente(
+        dfh,
+        [
+            "Inconsistência",
+            "Inconsistencia",
+            "Descrição Inconsistência",
+            "Descricao Inconsistencia"
+        ]
+    )
+
     if not col_servico or not col_inc:
         return pd.DataFrame()
 
