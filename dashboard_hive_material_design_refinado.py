@@ -1935,26 +1935,13 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
 
     dfh = df_hist.copy()
 
-    col_tipo = _coluna_existente(
-        dfh,
-        ["Tipo Histórico", "Tipo Historico"]
-    )
-
-    col_servico = _coluna_existente(
-        dfh,
-        ["Serviço", "Servico"]
-    )
+    col_tipo = _coluna_existente(dfh, ["Tipo Histórico", "Tipo Historico"])
+    col_servico = _coluna_existente(dfh, ["Serviço", "Servico"])
 
     filtro = pd.Series(False, index=dfh.index)
 
     if col_tipo:
-
-        tipo = (
-            dfh[col_tipo]
-            .astype(str)
-            .str.upper()
-            .str.strip()
-        )
+        tipo = dfh[col_tipo].astype(str).str.upper().str.strip()
 
         filtro |= (
             tipo.str.contains("CR", na=False)
@@ -1962,21 +1949,8 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
             tipo.str.contains("MINUTO", na=False)
         )
 
-        # NOVO → aceita histórico diário
-        filtro |= (
-            tipo.str.contains("INCONSIST", na=False)
-            &
-            tipo.str.contains("DIA", na=False)
-        )
-
     if col_servico:
-
-        serv = (
-            dfh[col_servico]
-            .astype(str)
-            .str.upper()
-            .str.strip()
-        )
+        serv = dfh[col_servico].astype(str).str.upper().str.strip()
 
         filtro |= (
             serv.str.contains("CR", na=False)
@@ -1989,24 +1963,11 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
     if dfh.empty:
         return pd.DataFrame()
 
-    col_data = _coluna_existente(
-        dfh,
-        ["Data/Hora", "Data Hora", "Data"]
-    )
+    col_data = _coluna_existente(dfh, ["Data/Hora", "Data Hora", "Data"])
 
     if col_data:
-
-        dfh["_ordem"] = pd.to_datetime(
-            dfh[col_data],
-            dayfirst=True,
-            errors="coerce"
-        )
-
-        dfh = (
-            dfh
-            .sort_values("_ordem", ascending=False)
-            .drop(columns="_ordem")
-        )
+        dfh["_ordem"] = pd.to_datetime(dfh[col_data], dayfirst=True, errors="coerce")
+        dfh = dfh.sort_values("_ordem", ascending=False).drop(columns="_ordem")
 
     return dfh.head(50)
 
