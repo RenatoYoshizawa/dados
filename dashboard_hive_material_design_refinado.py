@@ -1983,10 +1983,25 @@ def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.Da
             "Total ciclo atual": "sum",
             "Diferença": "sum"
         })
-        .sort_values(["Total ciclo atual", "Diferença"], ascending=[False, False])
     )
-
-    total_geral = pd.to_numeric(base["Total ciclo atual"], errors="coerce").fillna(0).sum()
+    
+    # Remove inconsistências com total zerado
+    base["Total ciclo atual"] = pd.to_numeric(
+        base["Total ciclo atual"],
+        errors="coerce"
+    ).fillna(0).astype(int)
+    
+    base = base[base["Total ciclo atual"] > 0].copy()
+    
+    if base.empty:
+        return pd.DataFrame(columns=["Descrição", "Total", "%"])
+    
+    base = base.sort_values(
+        ["Total ciclo atual", "Diferença"],
+        ascending=[False, False]
+    )
+    
+    total_geral = base["Total ciclo atual"].sum()
 
     if total_geral > 0:
         base["%"] = (
