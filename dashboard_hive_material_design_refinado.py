@@ -1377,22 +1377,70 @@ def _existe_full_posterior_ao_stop(df_criticas: pd.DataFrame, df_hist: pd.DataFr
 def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: pd.DataFrame = None):
     """
     Regra:
-    - OFF: quando houver STOP PROCESSO ativado = SIM para o respectivo serviço.
-    - ON: somente quando houver ciclo FULL posterior ao último STOP do serviço.
+    - OFF: quando houver STOP PROCESSO ativado = SIM para o serviço.
+    - ON: quando houver novo ciclo de monitoramento posterior ao STOP
+      com aumento no contador de inconsistência do serviço.
     """
+
     status = {
         "0KM": "ON",
         "Transferência 2": "ON",
         "Transferência 3": "ON",
     }
 
+    # Primeiro marca OFF pelos STOPs encontrados
     for servico in _servicos_stop_sim(df_criticas, df_hist):
         status[servico] = "OFF"
 
-    for servico in list(status.keys()):
-        if status[servico] == "OFF":
-            if _existe_full_posterior_ao_stop(df_criticas, df_hist, servico):
-                status[servico] = "ON"
+    if df_monitor is None or df_monitor.empty:
+        return status
+
+    dfm = normalizar_coluna_data_para_date(df_monitor)
+
+    if "Data/Hora" not in dfm.columns:
+        return status
+
+    dfm["_data_hora_monitor"] = pd.to_datetime(
+        dfm["Data/Hora"],
+        dayfirst=True,
+        errors="coerce",
+        format="mixed",
+    )
+
+    def houve_aumento_apos_stop(chave_servico: str, coluna_incons: str) -> bool:
+        ultimo_stop = _ultimo_stop_servico(df_criticas, df_hist, chave_servico)
+
+        if ultimo_stop is None:
+            return False
+
+        if coluna_incons not in dfm.columns:
+            return False
+
+        tmp = dfm[dfm["_data_hora_monitor"] > ultimo_stop].copy()
+
+        if len(tmp) < 2:
+            return False
+
+        tmp[coluna_incons] = pd.to_numeric(
+            tmp[coluna_incons],
+            errors="coerce"
+        ).fillna(0)
+
+        return tmp[coluna_incons].diff().fillna(0).gt(0).any()
+
+    # 0KM volta ON se Inconsistência 0km aumentou após o STOP
+    if status["0KM"] == "OFF":
+        if houve_aumento_apos_stop("0KM", "Inconsistência 0km"):
+            status["0KM"] = "ON"
+
+    # Transferência 2 e 3 usam a mesma coluna agregada
+    if status["Transferência 2"] == "OFF":
+        if houve_aumento_apos_stop("Transferência 2", "Inconsistência 2 e 3"):
+            status["Transferência 2"] = "ON"
+
+    if status["Transferência 3"] == "OFF":
+        if houve_aumento_apos_stop("Transferência 3", "Inconsistência 2 e 3"):
+            status["Transferência 3"] = "ON"
 
     return status
 
