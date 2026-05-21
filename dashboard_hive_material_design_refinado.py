@@ -1157,15 +1157,45 @@ def _df_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
 
 
 def _servico_para_chave(valor: str) -> str | None:
-    txt = str(valor or "").lower()
-    if "primeiro" in txt or "0km" in txt or "0 km" in txt or txt.strip() in {"1", "01"}:
-        return "0KM"
-    if "propriet" in txt or "transferência proprietário" in txt or "transferencia proprietario" in txt or txt.strip() in {"2", "02"}:
-        return "Transferência 2"
-    if "estado" in txt or "munic" in txt or "município" in txt or "transferência estado" in txt or "transferencia estado" in txt or txt.strip() in {"3", "03"}:
-        return "Transferência 3"
-    return None
 
+    txt = str(valor or "").lower()
+
+    # 0KM
+    if any(x in txt for x in [
+        "primeiro registro",
+        "primeiro registro do veículo",
+        "primeiro registro do veiculo",
+        "0km",
+        "0 km",
+        "pr"
+    ]):
+        return "0KM"
+
+    # Transferência proprietário
+    if any(x in txt for x in [
+        "transferência proprietário",
+        "transferencia proprietario",
+        "proprietário",
+        "proprietario",
+        "tp"
+    ]):
+        return "Transferência 2"
+
+    # Transferência município/estado
+    if any(x in txt for x in [
+        "transferência município",
+        "transferencia municipio",
+        "transferência estado",
+        "transferencia estado",
+        "município",
+        "municipio",
+        "estado",
+        "tm",
+        "te"
+    ]):
+        return "Transferência 3"
+
+    return None
 
 def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[str]:
     """
