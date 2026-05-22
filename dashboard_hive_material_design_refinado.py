@@ -419,12 +419,12 @@ menu_html = """
 
     <a class="menu-item"
        href="?pagina=Monitoramento atual">
-       📊 Monitoramento atual
+       📊 Monitoramento
     </a>
 
     <a class="menu-item"
        href="?pagina=Histórico monitoramento">
-       📁 Histórico monitoramento
+       📁 Histórico
     </a>
 
 </div>
