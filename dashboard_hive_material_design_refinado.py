@@ -1612,6 +1612,164 @@ def line_chart(df, cols, title):
 
     return fig_layout(fig, height=520)
 
+def line_chart_comparativo_horario(
+    df_base,
+    df_comp,
+    cols,
+    title,
+    label_base="Data selecionada",
+    label_comp="Data comparativa",
+):
+    """
+    Gráfico comparativo por Horário.
+    Quando houver data comparativa, mantém somente os horários existentes nos dois dias.
+    """
+    fig = go.Figure()
+
+    if df_base is None or df_base.empty:
+        return fig_layout(fig, height=520)
+
+    if "Horário" not in df_base.columns:
+        return line_chart(df_base, cols, title)
+
+    df_base = df_base.copy()
+    df_base["Horário"] = df_base["Horário"].astype(str).str.slice(0, 5)
+
+    tem_comparativo = df_comp is not None and not df_comp.empty and "Horário" in df_comp.columns
+
+    if tem_comparativo:
+        df_comp = df_comp.copy()
+        df_comp["Horário"] = df_comp["Horário"].astype(str).str.slice(0, 5)
+
+        colunas_comuns = [
+            c for c in cols
+            if c in df_base.columns and c in df_comp.columns
+        ]
+
+        if not colunas_comuns:
+            tem_comparativo = False
+            df_plot = df_base.copy()
+        else:
+            df_plot = pd.merge(
+                df_base[["Horário"] + colunas_comuns],
+                df_comp[["Horário"] + colunas_comuns],
+                on="Horário",
+                how="inner",
+                suffixes=("_base", "_comp"),
+            )
+
+            if df_plot.empty:
+                fig.update_layout(
+                    title=dict(
+                        text=f"{title} - sem horários coincidentes para comparação",
+                        font=dict(size=16, color="#202124"),
+                        y=0.98,
+                        x=0.01,
+                        xanchor="left",
+                    )
+                )
+                return fig_layout(fig, height=520)
+    else:
+        df_plot = df_base.copy()
+
+    x_labels = df_plot["Horário"].astype(str).tolist()
+    x_vals = list(range(len(x_labels)))
+
+    def cor_coluna(col):
+        nome_lower = str(col).lower()
+        if "sucesso" in nome_lower:
+            return "#188038"
+        if "incons" in nome_lower:
+            return "#D93025"
+        if "fila" in nome_lower:
+            return "#F9AB00"
+        return "#1A73E8"
+
+    y_max = 0
+
+    for col in cols:
+        cor = cor_coluna(col)
+        col_base = f"{col}_base" if tem_comparativo else col
+
+        if col_base not in df_plot.columns:
+            continue
+
+        y_base = pd.to_numeric(df_plot[col_base], errors="coerce").fillna(0).astype(int)
+        if not y_base.empty:
+            y_max = max(y_max, float(y_base.max()))
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_base,
+                mode="lines+markers+text",
+                text=[fmt_num(v) for v in y_base],
+                textposition="top center",
+                textfont=dict(size=10, color=cor),
+                name=f"{col} - {label_base}",
+                line=dict(width=2.6, color=cor),
+                marker=dict(size=5, color=cor),
+                customdata=x_labels,
+                hovertemplate="%{customdata}<br>" + f"{col} - {label_base}: " + "%{y}<extra></extra>",
+                cliponaxis=False,
+            )
+        )
+
+        col_comp = f"{col}_comp"
+        if tem_comparativo and col_comp in df_plot.columns:
+            y_comp = pd.to_numeric(df_plot[col_comp], errors="coerce").fillna(0).astype(int)
+            if not y_comp.empty:
+                y_max = max(y_max, float(y_comp.max()))
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x_vals,
+                    y=y_comp,
+                    mode="lines+markers",
+                    name=f"{col} - {label_comp}",
+                    line=dict(width=2.4, color=cor, dash="dash"),
+                    marker=dict(size=5, color=cor, symbol="circle-open"),
+                    customdata=x_labels,
+                    hovertemplate="%{customdata}<br>" + f"{col} - {label_comp}: " + "%{y}<extra></extra>",
+                    cliponaxis=False,
+                )
+            )
+
+    passo = max(1, len(x_vals) // 20)
+    tickvals = x_vals[::passo]
+    ticktext = x_labels[::passo]
+
+    janela = 25
+    inicio = max(0, len(x_vals) - janela)
+    fim = max(1, len(x_vals) - 1)
+
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=ticktext,
+        tickangle=-45,
+        range=[inicio, fim],
+        rangeslider=dict(visible=True),
+    )
+
+    if y_max > 0:
+        fig.update_yaxes(range=[0, y_max * 1.28])
+    else:
+        fig.update_yaxes(range=[0, 1])
+
+    fig.update_layout(
+        title=dict(
+            text=title,
+            font=dict(size=16, color="#202124"),
+            y=0.98,
+            x=0.01,
+            xanchor="left",
+        )
+    )
+
+    return fig_layout(fig, height=520)
+
+
 def extrair_mensagem_inconsistencia(valor):
     texto = str(valor or "").strip()
 
@@ -2518,18 +2676,59 @@ elif pagina == "Histórico monitoramento":
         st.error("Nenhuma data disponível no histórico.")
         st.stop()
 
-    data_selecionada = st.date_input(
-        "Selecionar data",
-        value=datas_disponiveis[0],
-        min_value=min(datas_disponiveis),
-        max_value=max(datas_disponiveis),
-        format="DD/MM/YYYY",
-    )
+    col_data_1, col_data_2 = st.columns(2)
+
+    with col_data_1:
+        data_selecionada = st.date_input(
+            "Selecionar data",
+            value=datas_disponiveis[0],
+            min_value=min(datas_disponiveis),
+            max_value=max(datas_disponiveis),
+            format="DD/MM/YYYY",
+            key="data_historico_principal",
+        )
 
     data_ref = pd.to_datetime(data_selecionada, errors="coerce").date()
 
+    datas_comparacao = [
+        d for d in datas_disponiveis
+        if d != data_ref
+    ]
+
+    with col_data_2:
+        comparar_datas = st.checkbox(
+            "Comparar com outra data",
+            value=False,
+            key="comparar_historico_dia",
+        )
+
+        if comparar_datas and datas_comparacao:
+            data_comparativa = st.date_input(
+                "Data para comparação",
+                value=datas_comparacao[0],
+                min_value=min(datas_disponiveis),
+                max_value=max(datas_disponiveis),
+                format="DD/MM/YYYY",
+                key="data_historico_comparativa",
+            )
+        else:
+            data_comparativa = None
+
     df_dia = df_mon_hist[df_mon_hist["Data"] == data_ref].copy()
     df_dia = agrupar_monitoramento_por_horario(df_dia)
+
+    if comparar_datas and data_comparativa:
+        data_ref_comp = pd.to_datetime(data_comparativa, errors="coerce").date()
+        df_dia_comp = df_mon_hist[df_mon_hist["Data"] == data_ref_comp].copy()
+        df_dia_comp = agrupar_monitoramento_por_horario(df_dia_comp)
+
+        if df_dia_comp.empty:
+            st.warning(
+                f"Não há registros de monitoramento para comparação em {data_ref_comp.strftime('%d/%m/%Y')}."
+            )
+    else:
+        data_ref_comp = None
+        df_dia_comp = pd.DataFrame()
 
     if df_inc_hist is not None and not df_inc_hist.empty and "Data" in df_inc_hist.columns:
         df_hist_dia = df_inc_hist[df_inc_hist["Data"] == data_ref].copy()
@@ -2565,10 +2764,13 @@ elif pagina == "Histórico monitoramento":
         st.markdown('<div class="panel">', unsafe_allow_html=True)
         st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
         st.plotly_chart(
-            line_chart(
+            line_chart_comparativo_horario(
                 df_dia,
+                df_dia_comp if comparar_datas else None,
                 ["Sucesso 2 e 3", "Fila 2 e 3", "Inconsistência 2 e 3"],
                 "Transferências - Histórico do dia",
+                data_ref.strftime("%d/%m/%Y"),
+                data_ref_comp.strftime("%d/%m/%Y") if data_ref_comp else "",
             ),
             use_container_width=True,
         )
@@ -2578,10 +2780,13 @@ elif pagina == "Histórico monitoramento":
         st.markdown('<div class="panel">', unsafe_allow_html=True)
         st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
         st.plotly_chart(
-            line_chart(
+            line_chart_comparativo_horario(
                 df_dia,
+                df_dia_comp if comparar_datas else None,
                 ["Sucesso 0km", "Fila 0km", "Inconsistência 0km"],
                 "0KM - Histórico do dia",
+                data_ref.strftime("%d/%m/%Y"),
+                data_ref_comp.strftime("%d/%m/%Y") if data_ref_comp else "",
             ),
             use_container_width=True,
         )
