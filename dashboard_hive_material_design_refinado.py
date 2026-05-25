@@ -1567,6 +1567,35 @@ def fig_layout(fig, height=520):
     return fig
 
 
+
+def adicionar_quantidade_processos(df_base: pd.DataFrame) -> pd.DataFrame:
+    if df_base is None or df_base.empty:
+        return df_base
+
+    df_base = df_base.copy()
+
+    if "Sucesso 2 e 3" in df_base.columns:
+        df_base["Quantidade de processos - Transferências"] = (
+            pd.to_numeric(df_base["Sucesso 2 e 3"], errors="coerce")
+            .fillna(0)
+            .diff()
+            .fillna(0)
+            .clip(lower=0)
+            .astype(int)
+        )
+
+    if "Sucesso 0km" in df_base.columns:
+        df_base["Quantidade de processos - 0KM"] = (
+            pd.to_numeric(df_base["Sucesso 0km"], errors="coerce")
+            .fillna(0)
+            .diff()
+            .fillna(0)
+            .clip(lower=0)
+            .astype(int)
+        )
+
+    return df_base
+
 def line_chart(df, cols, title):
     fig = go.Figure()
 
@@ -2473,6 +2502,8 @@ if pagina == "Monitoramento atual":
         render_robos_card(robos, robo_monitoramento_online)
 
 
+    df = adicionar_quantidade_processos(df)
+
     # =========================
     # GRÁFICOS
     # =========================
@@ -2488,6 +2519,21 @@ if pagina == "Monitoramento atual":
                 df,
                 ["Sucesso 2 e 3"],
                 "Transferências - Sucesso",
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Quantidade de processos - Transferências"],
+                "Quantidade de processos",
             ),
             use_container_width=True,
         )
@@ -2519,6 +2565,21 @@ if pagina == "Monitoramento atual":
                 df,
                 ["Sucesso 0km"],
                 "0KM - Sucesso",
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Quantidade de processos - 0KM"],
+                "Quantidade de processos",
             ),
             use_container_width=True,
         )
@@ -2769,6 +2830,11 @@ elif pagina == "Histórico monitoramento":
     else:
         df_hist_dia = pd.DataFrame()
 
+    df_dia = adicionar_quantidade_processos(df_dia)
+
+    if comparar_datas and df_dia_comp is not None and not df_dia_comp.empty:
+        df_dia_comp = adicionar_quantidade_processos(df_dia_comp)
+
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Tabela de monitoramento da data selecionada</div>', unsafe_allow_html=True)
 
@@ -2797,9 +2863,11 @@ elif pagina == "Histórico monitoramento":
     if not df_dia.empty:
         graficos_historico = [
             ("Transferências - Sucesso", ["Sucesso 2 e 3"]),
+            ("Transferências - Quantidade de processos", ["Quantidade de processos - Transferências"]),
             ("Transferências - Fila", ["Fila 2 e 3"]),
             ("Transferências - Inconsistências", ["Inconsistência 2 e 3"]),
             ("0KM - Sucesso", ["Sucesso 0km"]),
+            ("0KM - Quantidade de processos", ["Quantidade de processos - 0KM"]),
             ("0KM - Fila", ["Fila 0km"]),
             ("0KM - Inconsistências", ["Inconsistência 0km"]),
         ]
