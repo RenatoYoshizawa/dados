@@ -1035,23 +1035,42 @@ def cor_criticas_minuto(valor):
     else:
         return "#D93025"  # vermelho
 
-def obter_total_criticas_minuto(df_criticas: pd.DataFrame) -> int:
+def obter_total_criticas_minuto(df_criticas: pd.DataFrame, tolerancia_minutos: int = 3) -> int:
     if df_criticas is None or df_criticas.empty:
         return 0
 
-    if "Tipo Linha" in df_criticas.columns:
-        resumo = df_criticas[
-            df_criticas["Tipo Linha"].astype(str).str.upper().str.strip() == "RESUMO"
-        ]
-        if not resumo.empty and "Total críticas no minuto" in resumo.columns:
-            return int(pd.to_numeric(resumo.iloc[-1]["Total críticas no minuto"], errors="coerce") or 0)
+    dfc = df_criticas.copy()
 
-    if "Total críticas no minuto" in df_criticas.columns:
-        s = pd.to_numeric(df_criticas["Total críticas no minuto"], errors="coerce").dropna()
-        if not s.empty:
-            return int(s.iloc[-1])
+    col_data = _coluna_existente(dfc, ["Data/Hora", "Data Hora", "Data"])
+    col_total = _coluna_existente(dfc, ["Total críticas no minuto", "Total ciclo atual"])
 
-    return 0
+    if not col_total:
+        return 0
+
+    if "Tipo Linha" in dfc.columns:
+        dfc = dfc[dfc["Tipo Linha"].astype(str).str.upper().str.strip() == "RESUMO"].copy()
+
+    if "Tipo Histórico" in dfc.columns:
+        dfc = dfc[dfc["Tipo Histórico"].astype(str).str.upper().str.contains("CRÍTICA_MINUTO|CRITICA_MINUTO", na=False)].copy()
+
+    if dfc.empty:
+        return 0
+
+    if col_data:
+        dfc["_data"] = pd.to_datetime(dfc[col_data], dayfirst=True, errors="coerce")
+        dfc = dfc.dropna(subset=["_data"]).sort_values("_data")
+
+        if dfc.empty:
+            return 0
+
+        ultima_data = dfc.iloc[-1]["_data"]
+        minutos = (pd.Timestamp.now() - ultima_data).total_seconds() / 60
+
+        if minutos > tolerancia_minutos:
+            return 0
+
+    valor = pd.to_numeric(dfc.iloc[-1][col_total], errors="coerce")
+    return int(valor) if pd.notna(valor) else 0
 
 
 def _valor_sim(valor) -> bool:
@@ -1243,6 +1262,15 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
         else:
             tmp["_data"] = pd.Timestamp.now()
 
+        agora = pd.Timestamp.now()
+        tmp = tmp[
+            tmp["_data"].notna()
+            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= 20)
+        ].copy()
+
+        if tmp.empty:
+            continue
+
         for _, row in tmp.iterrows():
 
             textos = []
@@ -1323,6 +1351,15 @@ def _ultimo_stop_servico(df_criticas: pd.DataFrame, df_hist: pd.DataFrame, chave
             continue
 
         tmp["_data"] = pd.to_datetime(tmp[col_data], dayfirst=True, errors="coerce")
+
+        agora = pd.Timestamp.now()
+        tmp = tmp[
+            tmp["_data"].notna()
+            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= 20)
+        ].copy()
+
+        if tmp.empty:
+            continue
 
         for _, row in tmp.iterrows():
             textos = []
