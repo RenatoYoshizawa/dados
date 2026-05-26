@@ -2070,19 +2070,36 @@ def normalizar_coluna_data_para_date(df_base: pd.DataFrame) -> pd.DataFrame:
 
     return df_base
 
-def filtrar_historico_por_dia(df_base: pd.DataFrame, data_ref=None) -> pd.DataFrame:
-    if df_base is None or df_base.empty:
+def filtrar_historico_por_dia(df):
+    if df is None or df.empty:
         return pd.DataFrame()
 
-    df_aux = normalizar_coluna_data_para_date(df_base)
+    df = df.copy()
 
-    if "Data" not in df_aux.columns:
-        return df_aux
+    col_data = _coluna_existente(
+        df,
+        ["Data/Hora", "Data Hora", "Data"]
+    )
 
-    if data_ref is None:
-        data_ref = datetime.now().date()
+    if not col_data:
+        return df
 
-    return df_aux[df_aux["Data"] == data_ref].copy()
+    df["_data"] = pd.to_datetime(
+        df[col_data],
+        dayfirst=True,
+        errors="coerce",
+        format="mixed",
+    )
+
+    hoje = pd.Timestamp.now().date()
+
+    return (
+        df[
+            df["_data"].dt.date == hoje
+        ]
+        .drop(columns=["_data"], errors="ignore")
+        .copy()
+    )
 
 def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
     dfh = _df_historico_full_ultimo_ciclo(df_hist)
