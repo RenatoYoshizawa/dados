@@ -2348,9 +2348,20 @@ def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.Da
     else:
         base["%"] = "0,00%"
 
-    return base[["Descrição", "Total ciclo atual", "%"]].rename(columns={
-        "Total ciclo atual": "Total"
-    })
+    # Total do serviço (0KM ou Transferências)
+    total_servico = int(base["Total ciclo atual"].sum())
+    
+    return (
+        base[
+            ["Descrição", "Total ciclo atual", "%"]
+        ]
+        .rename(
+            columns={
+                "Total ciclo atual": f"Total ({fmt_num(total_servico)})",
+                "%": "% (100%)"
+            }
+        )
+    )
 
 
 def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
