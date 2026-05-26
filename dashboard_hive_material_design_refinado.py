@@ -2091,12 +2091,16 @@ def filtrar_historico_por_dia(df):
         format="mixed",
     )
 
-    hoje = pd.Timestamp.now().date()
+    df = df[df["_data"].notna()].copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # Usa a última data existente no próprio histórico
+    data_referencia = df["_data"].dt.date.max()
 
     return (
-        df[
-            df["_data"].dt.date == hoje
-        ]
+        df[df["_data"].dt.date == data_referencia]
         .drop(columns=["_data"], errors="ignore")
         .copy()
     )
