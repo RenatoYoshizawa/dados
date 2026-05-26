@@ -2275,21 +2275,22 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     if out.empty:
         return pd.DataFrame()
 
-    # Mantém o registro mais recente de cada inconsistência por serviço.
-    out = out.sort_values(["_data_sort", "_ordem"], ascending=[True, True])
-    
-    out = out.drop_duplicates(
-        subset=["_chave_servico", "Descrição agrupada"],
-        keep="last"
+    # Mantém somente o último valor da inconsistência por serviço
+    out = out.sort_values(
+        ["_data_sort", "_ordem"],
+        ascending=[True, True]
     )
     
     out = (
-        out.groupby(["_chave_servico", "Descrição agrupada"], as_index=False)
+        out.groupby(
+            ["_chave_servico", "Descrição agrupada"],
+            as_index=False
+        )
         .agg({
-            "Serviço": "first",
-            "Total anterior": "sum",
-            "Total ciclo atual": "sum",
-            "Diferença": "sum",
+            "Serviço": "last",
+            "Total anterior": "last",
+            "Total ciclo atual": "last",
+            "Diferença": "last",
             "_data_sort": "max"
         })
     )
