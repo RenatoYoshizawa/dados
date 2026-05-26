@@ -2175,7 +2175,7 @@ def filtrar_historico_por_dia(df):
     )
 
 def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
-    dfh = _df_historico_full_ultimo_ciclo(df_hist)
+    dfh = _df_historico_full(df_hist)
     if dfh.empty:
         return pd.DataFrame()
 
