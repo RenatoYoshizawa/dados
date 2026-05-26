@@ -2070,6 +2070,20 @@ def normalizar_coluna_data_para_date(df_base: pd.DataFrame) -> pd.DataFrame:
 
     return df_base
 
+def filtrar_historico_por_dia(df_base: pd.DataFrame, data_ref=None) -> pd.DataFrame:
+    if df_base is None or df_base.empty:
+        return pd.DataFrame()
+
+    df_aux = normalizar_coluna_data_para_date(df_base)
+
+    if "Data" not in df_aux.columns:
+        return df_aux
+
+    if data_ref is None:
+        data_ref = datetime.now().date()
+
+    return df_aux[df_aux["Data"] == data_ref].copy()
+
 def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
     dfh = _df_historico_full_ultimo_ciclo(df_hist)
     if dfh.empty:
@@ -2607,13 +2621,15 @@ if pagina == "Monitoramento atual":
     # TABELAS DE HISTÓRICO E INCONSISTÊNCIAS
     # =========================
 
+    df_hist_hoje = filtrar_historico_por_dia(df_hist)
+    
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Histórico de Inconsistências Críticas</div>', unsafe_allow_html=True)
 
     if df_hist is None or df_hist.empty:
         st.info("Histórico de críticas ainda não disponível.")
     else:
-        df_crit_minuto = tabela_historico_criticas_minuto(df_hist)
+        df_crit_minuto = tabela_historico_criticas_minuto(df_hist_hoje)
 
         if df_crit_minuto.empty:
             render_mensagem_tabela("Não há histórico de críticas do minuto para exibir.")
@@ -2662,7 +2678,7 @@ if pagina == "Monitoramento atual":
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Inconsistências - Top 5 - Ciclo atual (10 min)</div>', unsafe_allow_html=True)
 
-    df_top3 = tabela_top3_ciclo_atual(df_hist)
+    df_serv = tabela_historico_servico(df_hist_hoje, chave_servico)
     if df_top3.empty:
         render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
     else:
