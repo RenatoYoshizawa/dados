@@ -2289,24 +2289,38 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     
     out["Descrição"] = out["Descrição agrupada"]
 
-    with st.expander("DEBUG - Conferência inconsistências Transferências", expanded=False):
-    st.write("Totais por serviço:")
-    st.dataframe(
-        out.groupby("_chave_servico", as_index=False)["Total ciclo atual"].sum()
-    )
-
-    st.write("Linhas classificadas como Transferência:")
-    st.dataframe(
-        out[
-            out["_chave_servico"].astype(str).str.contains("Transfer", na=False)
-        ][[
-            "Serviço",
-            "Descrição",
-            "Descrição agrupada",
-            "Total ciclo atual",
-            "Diferença"
-        ]]
-    )
+    with st.expander(
+        "DEBUG - Conferência inconsistências Transferências",
+        expanded=False
+    ):
+    
+        st.write("Totais por serviço:")
+    
+        st.dataframe(
+            out.groupby(
+                "_chave_servico",
+                as_index=False
+            )["Total ciclo atual"].sum()
+        )
+    
+        st.write("Linhas classificadas como Transferência:")
+    
+        st.dataframe(
+            out[
+                out["_chave_servico"]
+                .astype(str)
+                .str.contains(
+                    "Transfer",
+                    na=False
+                )
+            ][[
+                "Serviço",
+                "Descrição",
+                "Descrição agrupada",
+                "Total ciclo atual",
+                "Diferença"
+            ]]
+        )
     
     return out
 
