@@ -2164,11 +2164,10 @@ def filtrar_historico_por_dia(df):
     if df.empty:
         return pd.DataFrame()
 
-    # Usa a última data existente no próprio histórico
-    data_referencia = df["_data"].dt.date.max()
+    hoje = datetime.now().date()
 
     return (
-        df[df["_data"].dt.date == data_referencia]
+        df[df["_data"].dt.date == hoje]
         .drop(columns=["_data"], errors="ignore")
         .copy()
     )
@@ -2241,7 +2240,7 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     registro mais recente de cada par Serviço + Descrição e mantém os totais
     daquele último registro.
     """
-    dfh = _df_historico_full_ultimo_ciclo(df_hist)
+    dfh = _df_historico_full(df_hist)
     if dfh.empty:
         return pd.DataFrame()
 
