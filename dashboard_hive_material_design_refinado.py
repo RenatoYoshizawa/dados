@@ -2281,10 +2281,14 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
         ["_data_sort", "_ordem"],
         ascending=[True, True]
     )
-    
+
     out = (
         out.groupby(
-            ["_chave_servico", "Descrição agrupada"],
+            [
+                "_chave_servico",
+                "Descrição agrupada",
+                "_data_sort"
+            ],
             as_index=False
         )
         .agg({
