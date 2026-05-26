@@ -2623,6 +2623,7 @@ if pagina == "Monitoramento atual":
 
     df_hist_hoje = filtrar_historico_por_dia(df_hist)
     
+    
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Histórico de Inconsistências Críticas</div>', unsafe_allow_html=True)
 
@@ -2678,7 +2679,8 @@ if pagina == "Monitoramento atual":
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Inconsistências - Top 5 - Ciclo atual (10 min)</div>', unsafe_allow_html=True)
 
-    df_serv = tabela_historico_servico(df_hist_hoje, chave_servico)
+    df_top3 = tabela_top3_ciclo_atual(df_hist_hoje)
+    
     if df_top3.empty:
         render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
     else:
@@ -2712,7 +2714,7 @@ if pagina == "Monitoramento atual":
             f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
             unsafe_allow_html=True,
         )
-        df_serv = tabela_historico_servico(df_hist, chave_servico)
+        df_serv = tabela_historico_servico(df_hist_hoje, chave_servico)
         if df_serv.empty:
             render_mensagem_tabela("Sem histórico de inconsistências registrado para este serviço.")
         else:
