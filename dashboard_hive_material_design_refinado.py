@@ -2241,7 +2241,7 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     registro mais recente de cada par Serviço + Descrição e mantém os totais
     daquele último registro.
     """
-    dfh = _df_historico_full(df_hist)
+    dfh = _df_historico_full_ultimo_ciclo(df_hist)
     if dfh.empty:
         return pd.DataFrame()
 
