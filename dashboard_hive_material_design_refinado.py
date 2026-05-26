@@ -24,6 +24,11 @@ GITHUB_OWNER = "RenatoYoshizawa"
 GITHUB_REPO = "Monitoramento"
 GITHUB_BRANCH = "main"
 
+WEBHOOK_TEAMS = st.secrets.get(
+    "WEBHOOK_TEAMS",
+    ""
+)
+
 GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
 GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
@@ -39,6 +44,7 @@ ARQ_LOCAL_HISTORICO = CACHE_DIR / "Historico_Criticas.xlsx"
 ARQ_LOCAL_MONITORAMENTO_HIST = CACHE_DIR / "Monitoramento_Historico.csv"
 ARQ_LOCAL_INCONSISTENCIAS_HIST = CACHE_DIR / "Inconsistencias_Historico.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
+ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 
@@ -474,6 +480,26 @@ def salvar_meta_cache(meta: dict):
     except Exception:
         pass
 
+def carregar_alerta_ecrv():
+    try:
+        if ARQ_ALERTA_ECRV.exists():
+            return json.loads(
+                ARQ_ALERTA_ECRV.read_text(encoding="utf-8")
+            )
+    except Exception:
+        pass
+
+    return {"alerta_enviado": False}
+
+
+def salvar_alerta_ecrv(dados):
+    try:
+        ARQ_ALERTA_ECRV.write_text(
+            json.dumps(dados, ensure_ascii=False),
+            encoding="utf-8"
+        )
+    except Exception:
+        pass
 
 def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigatorio: bool = False):
     """
@@ -1532,6 +1558,48 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
 
     st.markdown(html, unsafe_allow_html=True)
 
+def enviar_alerta_robo_ecrv_off(
+    robo_monitoramento_online,
+    minutos_sem_atualizacao=None
+):
+    estado = carregar_alerta_ecrv()
+
+    # Se voltou ON, libera novo alerta futuro
+    if robo_monitoramento_online:
+        if estado.get("alerta_enviado"):
+            estado["alerta_enviado"] = False
+            salvar_alerta_ecrv(estado)
+        return
+
+    # Se já enviou enquanto está OFF, não repete
+    if estado.get("alerta_enviado"):
+        return
+
+    try:
+        msg = (
+            "🚨 **Alerta – Robô e-CRV OFF**\n\n"
+            "O robô de monitoramento e-CRV está **OFF** no painel.\n"
+            "Não foi identificada atualização recente do arquivo principal de monitoramento."
+        )
+
+        if minutos_sem_atualizacao is not None:
+            msg += f"\n\nTempo sem atualização: **{int(minutos_sem_atualizacao)} minutos**."
+
+        payload = {"text": msg}
+
+        r = requests.post(
+            WEBHOOK_TEAMS,
+            json=payload,
+            timeout=20
+        )
+
+        if r.status_code in (200, 202):
+            estado["alerta_enviado"] = True
+            salvar_alerta_ecrv(estado)
+
+    except Exception:
+        pass
+
 def fig_layout(fig, height=520):
     fig.update_layout(
         height=height,
@@ -2413,12 +2481,18 @@ ultima_modificacao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 # fica mais de 15 minutos sem nova atualização no GitHub/cache.
 ultima_sync_github = meta_monitor.get("downloaded_at", "") if isinstance(meta_monitor, dict) else ""
 robo_monitoramento_online = True
+minutos_sem_atualizacao = None
+
 try:
     if ultima_sync_github:
         dt_sync = datetime.strptime(ultima_sync_github, "%d/%m/%Y %H:%M:%S")
         minutos_sem_atualizacao = (datetime.now() - dt_sync).total_seconds() / 60
+
         if minutos_sem_atualizacao > 15:
             robo_monitoramento_online = False
+    else:
+        robo_monitoramento_online = False
+
 except Exception:
     robo_monitoramento_online = False
 
@@ -2435,6 +2509,11 @@ total_sucesso = sucesso_trf + sucesso_0km
 total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
 
 robos = status_robos(df, df_criticas, df_hist)
+
+enviar_alerta_robo_ecrv_off(
+    robo_monitoramento_online,
+    minutos_sem_atualizacao
+)
 
 
 if pagina == "Monitoramento atual":
