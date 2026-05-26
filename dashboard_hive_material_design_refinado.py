@@ -1202,19 +1202,7 @@ def _df_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame:
 
 
 def _servico_para_chave(valor: str) -> str | None:
-
-    txt = str(valor or "").lower()
-
-    # 0KM
-    if any(x in txt for x in [
-        "primeiro registro",
-        "primeiro registro do veículo",
-        "primeiro registro do veiculo",
-        "0km",
-        "0 km",
-        "pr"
-    ]):
-        return "0KM"
+    txt = str(valor or "").lower().strip()
 
     # Transferência proprietário
     if any(x in txt for x in [
@@ -1240,8 +1228,22 @@ def _servico_para_chave(valor: str) -> str | None:
     ]):
         return "Transferência 3"
 
-    return None
+    # 0KM
+    if any(x in txt for x in [
+        "primeiro registro",
+        "primeiro registro do veículo",
+        "primeiro registro do veiculo",
+        "0km",
+        "0 km"
+    ]):
+        return "0KM"
 
+    # PR somente se for exatamente PR
+    if txt == "pr":
+        return "0KM"
+
+    return None
+    
 def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[str]:
     """
     Considera somente STOPs recentes (últimos 20 minutos)
