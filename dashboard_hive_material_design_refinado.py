@@ -226,7 +226,7 @@ button[kind="header"] {
 }
 
 .kpi-card.kpi-tall {
-    min-height: 235px;
+    min-height: 231px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -245,7 +245,7 @@ button[kind="header"] {
     font-size: 13px;
 }
 .kpi-card.kpi-robos-tall {
-    min-height: 235px;
+    min-height: 231px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -2647,7 +2647,10 @@ if pagina == "Monitoramento atual":
     # CARDS
     # =========================
 
-    cols = st.columns(5)
+    cols = st.columns(
+        5,
+        vertical_alignment="top"
+    )
 
     with cols[0]:
         render_card(
@@ -2665,7 +2668,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Fila TDV",
             fila_tdv,
-            cor_saude(fila_tdv, None, "negativo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
@@ -2685,7 +2688,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Sucesso TDV",
             sucesso_tdv,
-            cor_saude(sucesso_tdv, None, "positivo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
@@ -2705,13 +2708,13 @@ if pagina == "Monitoramento atual":
         render_card(
             "Inconsistências TDV",
             incons_tdv,
-            cor_saude(incons_tdv, None, "negativo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
     with cols[3]:
         render_card(
-            "Automatizado",
+            "Automatizado e-CRV",
             automatizado,
             cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
             f"Último registro: {hora_coleta}",
@@ -2720,7 +2723,7 @@ if pagina == "Monitoramento atual":
             "Total",
             total_sucesso,
             "#1A73E8",
-            "Sucesso Transferências + Sucesso 0KM",
+            "Soma Transferências, 0KM e TDV",
         )
         render_card(
             "TDV (Hora)",
