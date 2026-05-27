@@ -478,7 +478,6 @@ CSS_ESCURO = """
 .stApp {
     background: radial-gradient(circle at top left, #0B3D91 0%, #061529 28%, #030A14 100%) !important;
     color: var(--md-text) !important;
-    font-family: Arial, sans-serif !important;
 }
 
 .hover-menu {
@@ -498,8 +497,50 @@ CSS_ESCURO = """
     color: #33C7FF !important;
 }
 
-.hive-title { color: #EAF4FF !important; }
-.hive-subtitle { color: #9DB7D2 !important; }
+.hive-title {
+    font-size: 32px !important;
+    font-weight: 900 !important;
+    letter-spacing: .5px !important;
+    color: #EAF4FF !important;
+    margin-bottom: 0px !important;
+}
+
+.hive-subtitle {
+    color: #9DB7D2 !important;
+    font-size: 13px !important;
+    margin-top: 2px !important;
+    margin-bottom: 18px !important;
+}
+
+.kpi-label {
+    color: #9DB7D2 !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .6px !important;
+}
+
+.kpi-value {
+    font-size: 32px !important;
+    font-weight: 900 !important;
+    line-height: 1.08 !important;
+    margin-top: 8px !important;
+    white-space: nowrap !important;
+}
+
+.kpi-note {
+    color: #9DB7D2 !important;
+    font-size: 11px !important;
+    margin-top: 9px !important;
+}
+
+.panel-title {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #EAF4FF !important;
+    margin-bottom: 10px !important;
+    letter-spacing: .3px !important;
+}
 
 .kpi-card {
     background: linear-gradient(160deg, rgba(14,49,95,.96), rgba(7,25,49,.96)) !important;
@@ -515,8 +556,6 @@ CSS_ESCURO = """
     border: 1px solid rgba(91, 166, 255, 0.22) !important;
     box-shadow: 0 12px 28px rgba(0, 0, 0, .28) !important;
 }
-
-.panel-title { color: #EAF4FF !important; }
 
 .dark-table {
     background: #071931 !important;
