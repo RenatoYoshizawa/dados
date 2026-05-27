@@ -196,6 +196,8 @@ button[kind="header"] {
     color: var(--md-text);
     margin-bottom: 2px;
     letter-spacing: -.2px;
+    text-align: center;
+    width: 100%;
 }
 
 .hive-subtitle {
@@ -204,6 +206,8 @@ button[kind="header"] {
     font-weight: 400;
     margin-top: 2px;
     margin-bottom: 18px;
+    text-align: center;
+    width: 100%;
 }
 
 .kpi-card {
@@ -214,6 +218,50 @@ button[kind="header"] {
     min-height: 148px;
     box-shadow: var(--md-shadow);
     margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.kpi-card.kpi-tall {
+    min-height: 235px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.kpi-card.kpi-tall .kpi-label {
+    font-size: 20px;
+}
+
+.kpi-card.kpi-tall .kpi-value {
+    font-size: 40px;
+}
+
+.kpi-card.kpi-tall .kpi-note {
+    font-size: 13px;
+}
+.kpi-card.kpi-robos-tall {
+    min-height: 235px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+.kpi-card.kpi-robos-tall .kpi-label {
+    font-size: 20px;
+}
+
+.kpi-card.kpi-robos-tall .kpi-value {
+    font-size: 40px;
+}
+
+.kpi-card.kpi-robos-tall .kpi-note {
+    font-size: 13px;
 }
 
 .kpi-label {
@@ -1509,10 +1557,10 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
 
     return status
 
-def render_card(label, value, color, note="Último registro"):
+def render_card(label, value, color, note="Último registro", extra_class=""):
     st.markdown(
         f"""
-        <div class="kpi-card">
+        <div class="kpi-card {extra_class}">
             <div class="kpi-label">{label}</div>
             <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
             <div class="kpi-note">{note}</div>
@@ -1535,24 +1583,20 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
         return "#188038" if status == "ON" else "#D93025"
 
     html = f"""
-    <div class="kpi-card">
+    <div class="kpi-card kpi-robos-tall">
         <div class="kpi-label">Robôs</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:10px; align-items:start;">
-            <div>
-                <div style="font-size:13px; font-weight:600; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
-                    {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:700;">{status_t2}</span> Transferência 2
-                </div>
-                <div style="font-size:13px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:700;">{status_t3}</span> Transferência 3
-                </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; align-items:center; justify-items:center; width:100%;">
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:700;">{status_t2}</span> Transferência 2
             </div>
-            <div>
-                <div style="font-size:13px; font-weight:600; line-height:1.45; margin-bottom:10px; white-space:nowrap;">
-                    {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:700;">{status_0km}</span> 0KM
-                </div>
-                <div style="font-size:13px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:700;">{status_monitoramento}</span> e-CRV
-                </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:700;">{status_t3}</span> Transferência 3
+            </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:700;">{status_0km}</span> 0KM
+            </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:700;">{status_monitoramento}</span> Monitoramento e-CRV
             </div>
         </div>
     </div>
@@ -1657,6 +1701,16 @@ def adicionar_quantidade_processos(df_base: pd.DataFrame) -> pd.DataFrame:
     if "Sucesso 0km" in df_base.columns:
         df_base["Quantidade de processos - 0KM"] = (
             pd.to_numeric(df_base["Sucesso 0km"], errors="coerce")
+            .fillna(0)
+            .diff()
+            .fillna(0)
+            .clip(lower=0)
+            .astype(int)
+        )
+
+    if "Sucesso TDV" in df_base.columns:
+        df_base["Quantidade de processos - TDV"] = (
+            pd.to_numeric(df_base["Sucesso TDV"], errors="coerce")
             .fillna(0)
             .diff()
             .fillna(0)
@@ -2508,6 +2562,7 @@ except Exception as e:
 
 # Evita horários duplicados após normalização do RPA.
 df = agrupar_monitoramento_por_horario(df)
+df = adicionar_quantidade_processos(df)
 
 
 # =========================
@@ -2545,6 +2600,21 @@ automatizado = int(ultima.get("Automatizado", 0))
 fila_0km = int(ultima.get("Fila 0km", 0))
 sucesso_0km = int(ultima.get("Sucesso 0km", 0))
 incons_0km = int(ultima.get("Inconsistência 0km", 0))
+
+fila_tdv = int(ultima.get("Fila TDV", 0))
+sucesso_tdv = int(ultima.get("Sucesso TDV", 0))
+incons_tdv = int(ultima.get("Inconsistencia TDV", 0))
+
+tdv_hora = 0
+try:
+    if "Horário" in df.columns and "Quantidade de processos - TDV" in df.columns:
+        hora_ref = str(hora_coleta)[:2]
+        tdv_hora = int(
+            df[df["Horário"].astype(str).str.slice(0, 2) == hora_ref]["Quantidade de processos - TDV"]
+            .sum()
+        )
+except Exception:
+    tdv_hora = 0
 
 total_sucesso = sucesso_trf + sucesso_0km
 total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
@@ -2586,12 +2656,36 @@ if pagina == "Monitoramento atual":
             cor_saude(fila_trf, media_coluna(df_media, "Fila 2 e 3", hora_coleta), "negativo"),
             f"Último registro: {hora_coleta}",
         )
+        render_card(
+            "Fila 0KM",
+            fila_0km,
+            cor_saude(fila_0km, media_coluna(df_media, "Fila 0km", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+        render_card(
+            "Fila TDV",
+            fila_tdv,
+            cor_saude(fila_tdv, None, "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
 
     with cols[1]:
         render_card(
             "Sucesso Transferências",
             sucesso_trf,
             cor_saude(sucesso_trf, media_coluna(df_media, "Sucesso 2 e 3", hora_coleta), "positivo"),
+            f"Último registro: {hora_coleta}",
+        )
+        render_card(
+            "Sucesso 0KM",
+            sucesso_0km,
+            cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km", hora_coleta), "positivo"),
+            f"Último registro: {hora_coleta}",
+        )
+        render_card(
+            "Sucesso TDV",
+            sucesso_tdv,
+            cor_saude(sucesso_tdv, None, "positivo"),
             f"Último registro: {hora_coleta}",
         )
 
@@ -2602,6 +2696,18 @@ if pagina == "Monitoramento atual":
             cor_saude(incons_trf, media_coluna(df_media, "Inconsistência 2 e 3", hora_coleta), "negativo"),
             f"Último registro: {hora_coleta}",
         )
+        render_card(
+            "Inconsistências 0KM",
+            incons_0km,
+            cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km", hora_coleta), "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
+        render_card(
+            "Inconsistências TDV",
+            incons_tdv,
+            cor_saude(incons_tdv, None, "negativo"),
+            f"Último registro: {hora_coleta}",
+        )
 
     with cols[3]:
         render_card(
@@ -2610,6 +2716,18 @@ if pagina == "Monitoramento atual":
             cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
             f"Último registro: {hora_coleta}",
         )
+        render_card(
+            "Total",
+            total_sucesso,
+            "#1A73E8",
+            "Sucesso Transferências + Sucesso 0KM",
+        )
+        render_card(
+            "TDV (Hora)",
+            tdv_hora,
+            "#1A73E8",
+            "Emissões TDV na hora atual",
+        )
 
     with cols[4]:
         render_card(
@@ -2617,53 +2735,16 @@ if pagina == "Monitoramento atual":
             total_criticas_minuto,
             cor_criticas_minuto(total_criticas_minuto),
             "Total de críticas do minuto atual",
+            extra_class="kpi-tall",
         )
-
-    cols = st.columns(5)
-
-    with cols[0]:
-        render_card(
-            "Fila 0KM",
-            fila_0km,
-            cor_saude(fila_0km, media_coluna(df_media, "Fila 0km", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
-        )
-
-    with cols[1]:
-        render_card(
-            "Sucesso 0KM",
-            sucesso_0km,
-            cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km", hora_coleta), "positivo"),
-            f"Último registro: {hora_coleta}",
-        )
-
-    with cols[2]:
-        render_card(
-            "Inconsistências 0KM",
-            incons_0km,
-            cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
-        )
-
-    with cols[3]:
-        render_card(
-            "Total",
-            total_sucesso,
-            "#1A73E8",
-            "Sucesso Transferências + Sucesso 0KM",
-        )
-
-    with cols[4]:
         render_robos_card(robos, robo_monitoramento_online)
 
-
-    df = adicionar_quantidade_processos(df)
 
     # =========================
     # GRÁFICOS
     # =========================
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
@@ -2688,7 +2769,7 @@ if pagina == "Monitoramento atual":
             line_chart(
                 df,
                 ["Quantidade de processos - Transferências"],
-                "Quantidade de processos",
+                "Emissões Transferências",
             ),
             use_container_width=True,
         )
@@ -2734,7 +2815,7 @@ if pagina == "Monitoramento atual":
             line_chart(
                 df,
                 ["Quantidade de processos - 0KM"],
-                "Quantidade de processos",
+                "Emissões 0KM",
             ),
             use_container_width=True,
         )
@@ -2750,6 +2831,52 @@ if pagina == "Monitoramento atual":
                 df,
                 ["Fila 0km", "Inconsistência 0km"],
                 "0KM - Fila e Inconsistências",
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with c3:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Sucesso TDV"],
+                "TDV - Sucesso",
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Quantidade de processos - TDV"],
+                "Emissões TDV",
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-scroll"><div class="chart-inner">', unsafe_allow_html=True)
+
+        st.plotly_chart(
+            line_chart(
+                df,
+                ["Fila TDV", "Inconsistencia TDV"],
+                "TDV - Fila e Inconsistências",
             ),
             use_container_width=True,
         )
@@ -3000,6 +3127,10 @@ elif pagina == "Histórico monitoramento":
     if df_dia.empty:
         render_mensagem_tabela("Não há registros de monitoramento para a data selecionada.")
     else:
+        df_dia = adicionar_quantidade_processos(df_dia)
+        if comparar_datas and df_dia_comp is not None and not df_dia_comp.empty:
+            df_dia_comp = adicionar_quantidade_processos(df_dia_comp)
+
         colunas_exibir = [
             c for c in df_dia.columns
             if (
@@ -3022,13 +3153,17 @@ elif pagina == "Histórico monitoramento":
     if not df_dia.empty:
         graficos_historico = [
             ("Transferências - Sucesso", ["Sucesso 2 e 3"]),
-            ("Transferências - Quantidade de processos", ["Quantidade de processos - Transferências"]),
+            ("Transferências - Emissões Transferências", ["Quantidade de processos - Transferências"]),
             ("Transferências - Fila", ["Fila 2 e 3"]),
             ("Transferências - Inconsistências", ["Inconsistência 2 e 3"]),
             ("0KM - Sucesso", ["Sucesso 0km"]),
-            ("0KM - Quantidade de processos", ["Quantidade de processos - 0KM"]),
+            ("0KM - Emissões 0KM", ["Quantidade de processos - 0KM"]),
             ("0KM - Fila", ["Fila 0km"]),
             ("0KM - Inconsistências", ["Inconsistência 0km"]),
+            ("TDV - Sucesso", ["Sucesso TDV"]),
+            ("TDV - Emissões TDV", ["Quantidade de processos - TDV"]),
+            ("TDV - Fila", ["Fila TDV"]),
+            ("TDV - Inconsistências", ["Inconsistencia TDV"]),
         ]
 
         for titulo_grafico, colunas_grafico in graficos_historico:
