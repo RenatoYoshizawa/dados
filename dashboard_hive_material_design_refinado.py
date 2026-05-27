@@ -61,28 +61,6 @@ st.set_page_config(
 
 
 # =========================
-# TEMA / NAVEGAÇÃO
-# =========================
-
-query_params = st.query_params
-
-pagina = query_params.get(
-    "pagina",
-    "Monitoramento atual"
-)
-
-tema = str(query_params.get("tema", "claro")).strip().lower()
-if tema not in ("claro", "escuro"):
-    tema = "claro"
-
-TEMA_ESCURO = tema == "escuro"
-
-PLOT_BG = "rgba(7, 19, 31, 0.96)" if TEMA_ESCURO else "#FFFFFF"
-PLOT_TEXT = "#EAF4FF" if TEMA_ESCURO else "#202124"
-PLOT_MUTED = "#9DB7D2" if TEMA_ESCURO else "#5F6368"
-PLOT_GRID = "rgba(91, 166, 255, 0.16)" if TEMA_ESCURO else "rgba(60,64,67,0.14)"
-
-# =========================
 # CSS
 # =========================
 
@@ -248,7 +226,7 @@ button[kind="header"] {
 }
 
 .kpi-card.kpi-tall {
-    min-height: 235px;
+    min-height: 231px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -266,14 +244,16 @@ button[kind="header"] {
 .kpi-card.kpi-tall .kpi-note {
     font-size: 13px;
 }
+
 .kpi-card.kpi-robos-tall {
-    min-height: 235px;
+    min-height: 231px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
 }
+
 .kpi-card.kpi-robos-tall .kpi-label {
     font-size: 20px;
 }
@@ -470,112 +450,19 @@ button[kind="header"] {
 
 st.markdown(CSS, unsafe_allow_html=True)
 
-if TEMA_ESCURO:
-    CSS_ESCURO = """
-    <style>
-    :root {
-        --md-bg: #03070D;
-        --md-surface: #07131F;
-        --md-surface-container: #0A1B2D;
-        --md-surface-variant: #102A44;
-        --md-primary: #33C7FF;
-        --md-primary-dark: #1A73E8;
-        --md-text: #EAF4FF;
-        --md-muted: #9DB7D2;
-        --md-border: rgba(91, 166, 255, 0.24);
-        --md-green: #21D07A;
-        --md-yellow: #F6C343;
-        --md-red: #FF4D5E;
-        --md-blue-soft: rgba(51, 199, 255, 0.12);
-        --md-shadow: 0 14px 32px rgba(0, 0, 0, .34);
-    }
-
-    .stApp {
-        background: radial-gradient(circle at top left, #0B3D91 0%, #061529 30%, #03070D 100%) !important;
-        color: var(--md-text) !important;
-    }
-
-    .hover-menu {
-        background: #07131F !important;
-        border-right: 1px solid var(--md-border) !important;
-        box-shadow: var(--md-shadow) !important;
-    }
-
-    .menu-icon, .menu-title, .menu-item {
-        color: var(--md-text) !important;
-    }
-
-    .menu-item:hover {
-        background: rgba(51, 199, 255, 0.12) !important;
-        color: #33C7FF !important;
-    }
-
-    .kpi-card, .panel {
-        background: linear-gradient(160deg, rgba(14,49,95,.92), rgba(7,25,49,.96)) !important;
-        border: 1px solid var(--md-border) !important;
-        box-shadow: var(--md-shadow) !important;
-    }
-
-    .hive-title, .panel-title, .kpi-value {
-        color: var(--md-text) !important;
-    }
-
-    .hive-subtitle, .kpi-label, .kpi-note, .footer-note {
-        color: var(--md-muted) !important;
-    }
-
-    .dark-table {
-        background: var(--md-surface) !important;
-        color: var(--md-text) !important;
-        border: 1px solid var(--md-border) !important;
-        box-shadow: var(--md-shadow) !important;
-    }
-
-    .dark-table thead th,
-    .table-scroll .dark-table thead th {
-        background: var(--md-surface-variant) !important;
-        color: var(--md-text) !important;
-        border-bottom: 1px solid var(--md-border) !important;
-    }
-
-    .dark-table tbody td {
-        color: var(--md-text) !important;
-        border-bottom: 1px solid rgba(91, 166, 255, 0.12) !important;
-    }
-
-    .dark-table tbody tr:nth-child(even) {
-        background: #0A1B2D !important;
-    }
-
-    .dark-table tbody tr:nth-child(odd) {
-        background: #07131F !important;
-    }
-
-    .dark-table tbody tr:hover {
-        background: #102A44 !important;
-    }
-
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="input"] > div,
-    [data-testid="stDateInput"] input,
-    [data-testid="stTextInput"] input {
-        background-color: #07131F !important;
-        color: var(--md-text) !important;
-        border-color: var(--md-border) !important;
-    }
-    </style>
-    """
-    st.markdown(CSS_ESCURO, unsafe_allow_html=True)
-
 
 # =========================
 # MENU
 # =========================
 
-tema_alternativo = "escuro" if tema == "claro" else "claro"
-rotulo_tema = "🌙 Modo escuro" if tema == "claro" else "☀️ Modo claro"
+query_params = st.query_params
 
-menu_html = f"""
+pagina = query_params.get(
+    "pagina",
+    "Monitoramento atual"
+)
+
+menu_html = """
 <div class="hover-menu">
 
     <div class="menu-icon">
@@ -587,18 +474,13 @@ menu_html = f"""
     </div>
 
     <a class="menu-item"
-       href="?pagina=Monitoramento atual&tema={tema}">
+       href="?pagina=Monitoramento atual">
        📊 Monitoramento
     </a>
 
     <a class="menu-item"
-       href="?pagina=Histórico monitoramento&tema={tema}">
+       href="?pagina=Histórico monitoramento">
        📁 Histórico
-    </a>
-
-    <a class="menu-item"
-       href="?pagina={pagina}&tema={tema_alternativo}">
-       {rotulo_tema}
     </a>
 
 </div>
@@ -1772,22 +1654,22 @@ def fig_layout(fig, height=520):
         autosize=True,
         margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor=PLOT_BG,
-        font=dict(color=PLOT_TEXT, family="Google Sans, Roboto, Arial"),
+        plot_bgcolor="#FFFFFF",
+        font=dict(color="#202124", family="Google Sans, Roboto, Arial"),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.06,
             xanchor="left",
             x=0,
-            font=dict(size=11, color=PLOT_MUTED),
+            font=dict(size=11, color="#5F6368"),
             bgcolor="rgba(255,255,255,0)",
         ),
 
         xaxis=dict(
             gridcolor="#E0E0E0",
             zerolinecolor="#E0E0E0",
-            tickfont=dict(color=PLOT_MUTED),
+            tickfont=dict(color="#5F6368"),
             tickangle=-45,
             rangeslider=dict(visible=True),
         ),
@@ -1795,7 +1677,7 @@ def fig_layout(fig, height=520):
         yaxis=dict(
             gridcolor="#E0E0E0",
             zerolinecolor="#E0E0E0",
-            tickfont=dict(color=PLOT_MUTED),
+            tickfont=dict(color="#5F6368"),
         ),
     )
     return fig
@@ -1913,7 +1795,7 @@ def line_chart(df, cols, title):
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color=PLOT_TEXT),
+            font=dict(size=16, color="#202124"),
             y=0.98,
             x=0.01,
             xanchor="left",
@@ -1972,7 +1854,7 @@ def line_chart_comparativo_horario(
                 fig.update_layout(
                     title=dict(
                         text=f"{title} - sem horários coincidentes para comparação",
-                        font=dict(size=16, color=PLOT_TEXT),
+                        font=dict(size=16, color="#202124"),
                         y=0.98,
                         x=0.01,
                         xanchor="left",
@@ -2073,7 +1955,7 @@ def line_chart_comparativo_horario(
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color=PLOT_TEXT),
+            font=dict(size=16, color="#202124"),
             y=0.98,
             x=0.01,
             xanchor="left",
@@ -2767,7 +2649,10 @@ if pagina == "Monitoramento atual":
     # CARDS
     # =========================
 
-    cols = st.columns(5)
+    cols = st.columns(
+        5,
+        vertical_alignment="top"
+    )
 
     with cols[0]:
         render_card(
@@ -2785,7 +2670,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Fila TDV",
             fila_tdv,
-            cor_saude(fila_tdv, None, "negativo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
@@ -2805,7 +2690,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Sucesso TDV",
             sucesso_tdv,
-            cor_saude(sucesso_tdv, None, "positivo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
@@ -2825,13 +2710,13 @@ if pagina == "Monitoramento atual":
         render_card(
             "Inconsistências TDV",
             incons_tdv,
-            cor_saude(incons_tdv, None, "negativo"),
+            "#1A73E8",
             f"Último registro: {hora_coleta}",
         )
 
     with cols[3]:
         render_card(
-            "Automatizado",
+            "Automatizado e-CRV",
             automatizado,
             cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
             f"Último registro: {hora_coleta}",
@@ -3099,7 +2984,7 @@ if pagina == "Monitoramento atual":
 
     for titulo_servico, chave_servico in servicos_tabelas:
         st.markdown(
-            f'<div style="font-size:13px; font-weight:700; color:{PLOT_TEXT}; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
             unsafe_allow_html=True,
         )
         df_serv = tabela_historico_servico(df_hist_hoje, chave_servico)
@@ -3345,7 +3230,7 @@ elif pagina == "Histórico monitoramento":
         ("Transferências", "Transferências"),
     ]:
         st.markdown(
-            f'<div style="font-size:13px; font-weight:700; color:{PLOT_TEXT}; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
             unsafe_allow_html=True,
         )
 
