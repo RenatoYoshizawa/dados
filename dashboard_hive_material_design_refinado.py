@@ -1705,34 +1705,22 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
 
 def render_card(label, value, color, note="Último registro", extra_class=""):
     """
-    Renderiza card KPI com faixa lateral esquerda visível.
+    Renderiza card KPI com faixa lateral esquerda, sem faixa inferior.
 
-    A faixa é feita por um wrapper externo com fundo na cor recebida.
-    Isso evita conflito com o CSS do .kpi-card, principalmente no modo escuro,
-    e preserva a curvatura do card porque o wrapper usa o mesmo border-radius.
+    A faixa é aplicada como sombra interna horizontal do próprio card.
+    Assim não cria fundo colorido embaixo e preserva a curvatura do card.
     """
     cor_borda = color or "#1A73E8"
 
     st.markdown(
         f"""
-        <div style="
-            background:{cor_borda};
-            border-radius:24px;
-            padding-left:7px;
-            margin-bottom:18px;
-            box-shadow:var(--md-shadow);
-            overflow:hidden;
+        <div class="kpi-card {extra_class}" style="
+            box-shadow: inset 7px 0 0 0 {cor_borda}, var(--md-shadow) !important;
+            overflow:hidden !important;
         ">
-            <div class="kpi-card {extra_class}" style="
-                margin-bottom:0 !important;
-                border-radius:0 24px 24px 0 !important;
-                box-shadow:none !important;
-                width:100%;
-            ">
-                <div class="kpi-label">{label}</div>
-                <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
-                <div class="kpi-note">{note}</div>
-            </div>
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
+            <div class="kpi-note">{note}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1755,34 +1743,23 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     cor_borda_robos = "#188038" if all(s == "ON" for s in todos_status) else "#D93025"
 
     html = f"""
-    <div style="
-        background:{cor_borda_robos};
-        border-radius:24px;
-        padding-left:7px;
-        margin-bottom:18px;
-        box-shadow:var(--md-shadow);
-        overflow:hidden;
+    <div class="kpi-card kpi-robos-tall" style="
+        box-shadow: inset 7px 0 0 0 {cor_borda_robos}, var(--md-shadow) !important;
+        overflow:hidden !important;
     ">
-        <div class="kpi-card kpi-robos-tall" style="
-            margin-bottom:0 !important;
-            border-radius:0 24px 24px 0 !important;
-            box-shadow:none !important;
-            width:100%;
-        ">
-            <div class="kpi-label">Robôs</div>
-            <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; align-items:center; justify-items:center; width:100%;">
-                <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:700;">{status_t2}</span> Transferência 2
-                </div>
-                <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:700;">{status_t3}</span> Transferência 3
-                </div>
-                <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:700;">{status_0km}</span> 0KM
-                </div>
-                <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
-                    {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:700;">{status_monitoramento}</span> Monitoramento e-CRV
-                </div>
+        <div class="kpi-label">Robôs</div>
+        <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; align-items:center; justify-items:center; width:100%;">
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_t2)} <span style="color:{cor(status_t2)}; font-weight:700;">{status_t2}</span> Transferência 2
+            </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_t3)} <span style="color:{cor(status_t3)}; font-weight:700;">{status_t3}</span> Transferência 3
+            </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_0km)} <span style="color:{cor(status_0km)}; font-weight:700;">{status_0km}</span> 0KM
+            </div>
+            <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
+                {bolinha(status_monitoramento)} <span style="color:{cor(status_monitoramento)}; font-weight:700;">{status_monitoramento}</span> Monitoramento e-CRV
             </div>
         </div>
     </div>
