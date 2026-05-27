@@ -1704,10 +1704,9 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
     return status
 
 def render_card(label, value, color, note="Último registro", extra_class=""):
-    # Mantém o mapa de calor nos cards que usam cor_saude().
-    # TDV permanece sem mapa de calor, pois é renderizado com a cor fixa azul.
-    is_tdv = "TDV" in str(label).upper()
-    borda_calor = "" if is_tdv else f"border-left: 6px solid {color};"
+    # Borda lateral acompanha a cor do próprio card.
+    # Para TDV, a cor permanece fixa em azul, portanto a borda também fica azul.
+    borda_calor = f"border-left: 6px solid {color} !important;"
 
     st.markdown(
         f"""
@@ -1733,8 +1732,11 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     def cor(status):
         return "#188038" if status == "ON" else "#D93025"
 
+    todos_status = [status_t2, status_t3, status_0km, status_monitoramento]
+    cor_borda_robos = "#188038" if all(s == "ON" for s in todos_status) else "#D93025"
+
     html = f"""
-    <div class="kpi-card kpi-robos-tall">
+    <div class="kpi-card kpi-robos-tall" style="border-left: 6px solid {cor_borda_robos} !important;">
         <div class="kpi-label">Robôs</div>
         <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; align-items:center; justify-items:center; width:100%;">
             <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
