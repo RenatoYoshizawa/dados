@@ -448,21 +448,160 @@ button[kind="header"] {
 </style>
 """
 
+# Tema visual do painel: claro por padrão, escuro quando selecionado no menu lateral.
+query_params = st.query_params
+tema = str(query_params.get("tema", "claro")).lower().strip()
+if tema not in ("claro", "escuro"):
+    tema = "claro"
+
 st.markdown(CSS, unsafe_allow_html=True)
+
+CSS_ESCURO = """
+<style>
+:root {
+    --md-bg: #030A14;
+    --md-surface: #071931;
+    --md-surface-container: #0A2344;
+    --md-surface-variant: #0E315F;
+    --md-primary: #33C7FF;
+    --md-primary-dark: #0B5ED7;
+    --md-text: #EAF4FF;
+    --md-muted: #9DB7D2;
+    --md-border: rgba(91, 166, 255, 0.22);
+    --md-green: #21D07A;
+    --md-yellow: #F6C343;
+    --md-red: #FF4D5E;
+    --md-blue-soft: rgba(51, 199, 255, 0.12);
+    --md-shadow: 0 12px 28px rgba(0, 0, 0, .32);
+}
+
+.stApp {
+    background: radial-gradient(circle at top left, #0B3D91 0%, #061529 28%, #030A14 100%) !important;
+    color: var(--md-text) !important;
+}
+
+.hover-menu {
+    background: #071931 !important;
+    border-right: 1px solid rgba(91, 166, 255, 0.22) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .36) !important;
+}
+
+.menu-icon,
+.menu-title,
+.menu-item {
+    color: #EAF4FF !important;
+}
+
+.menu-item:hover {
+    background: rgba(51, 199, 255, 0.14) !important;
+    color: #33C7FF !important;
+}
+
+.hive-title { color: #EAF4FF !important; }
+.hive-subtitle { color: #9DB7D2 !important; }
+
+.kpi-card {
+    background: linear-gradient(160deg, rgba(14,49,95,.96), rgba(7,25,49,.96)) !important;
+    border: 1px solid rgba(91, 166, 255, 0.22) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .32) !important;
+}
+
+.kpi-label,
+.kpi-note { color: #9DB7D2 !important; }
+
+.panel {
+    background: rgba(7, 25, 49, .94) !important;
+    border: 1px solid rgba(91, 166, 255, 0.22) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .28) !important;
+}
+
+.panel-title { color: #EAF4FF !important; }
+
+.dark-table {
+    background: #071931 !important;
+    color: #EAF4FF !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .24) !important;
+}
+
+.dark-table thead th,
+.table-scroll .dark-table thead th {
+    background: #0E315F !important;
+    color: #EAF4FF !important;
+    border-bottom: 1px solid rgba(91, 166, 255, 0.25) !important;
+}
+
+.dark-table tbody td {
+    color: #EAF4FF !important;
+    border-bottom: 1px solid rgba(91, 166, 255, 0.12) !important;
+}
+
+.dark-table tbody tr:nth-child(even) { background: rgba(10, 35, 68, .96) !important; }
+.dark-table tbody tr:nth-child(odd) { background: rgba(7, 25, 49, .96) !important; }
+
+/* Ajusta textos inline usados nos subtítulos internos dos painéis. */
+.panel div[style*="color:#202124"],
+.panel div[style*="color: #202124"] {
+    color: #EAF4FF !important;
+}
+
+/* Componentes nativos do Streamlit no tema escuro */
+.stDateInput label,
+.stSelectbox label,
+.stMultiSelect label,
+.stCheckbox label,
+.stTextInput label {
+    color: #EAF4FF !important;
+}
+
+[data-baseweb="input"],
+[data-baseweb="select"] {
+    background-color: #071931 !important;
+    color: #EAF4FF !important;
+}
+
+/* Dataframes nativos, quando usados. */
+div[data-testid="stDataFrame"] {
+    border: 1px solid rgba(91, 166, 255, 0.22) !important;
+    border-radius: 14px !important;
+    background: rgba(7, 25, 49, .96) !important;
+}
+
+div[data-testid="stDataFrame"] [role="table"],
+div[data-testid="stDataFrame"] [role="gridcell"],
+div[data-testid="stDataFrame"] .glideDataEditor,
+div[data-testid="stDataFrame"] .dvn-scroller,
+div[data-testid="stDataFrame"] .gdg-cell {
+    background: rgba(7, 25, 49, .96) !important;
+    color: #EAF4FF !important;
+}
+
+div[data-testid="stDataFrame"] [role="columnheader"],
+div[data-testid="stDataFrame"] .gdg-header {
+    background: #0E315F !important;
+    color: #EAF4FF !important;
+}
+</style>
+"""
+
+if tema == "escuro":
+    st.markdown(CSS_ESCURO, unsafe_allow_html=True)
 
 
 # =========================
 # MENU
 # =========================
 
-query_params = st.query_params
+# query_params e tema já foram definidos acima, antes da aplicação do CSS.
 
 pagina = query_params.get(
     "pagina",
     "Monitoramento atual"
 )
 
-menu_html = """
+proximo_tema = "claro" if tema == "escuro" else "escuro"
+rotulo_tema = "☀️ Modo claro" if tema == "escuro" else "🌙 Modo escuro"
+
+menu_html = f"""
 <div class="hover-menu">
 
     <div class="menu-icon">
@@ -474,13 +613,18 @@ menu_html = """
     </div>
 
     <a class="menu-item"
-       href="?pagina=Monitoramento atual">
+       href="?pagina=Monitoramento atual&tema={tema}">
        📊 Monitoramento
     </a>
 
     <a class="menu-item"
-       href="?pagina=Histórico monitoramento">
+       href="?pagina=Histórico monitoramento&tema={tema}">
        📁 Histórico
+    </a>
+
+    <a class="menu-item"
+       href="?pagina={pagina}&tema={proximo_tema}">
+       {rotulo_tema}
     </a>
 
 </div>
@@ -1560,9 +1704,14 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
     return status
 
 def render_card(label, value, color, note="Último registro", extra_class=""):
+    # Mantém o mapa de calor nos cards que usam cor_saude().
+    # TDV permanece sem mapa de calor, pois é renderizado com a cor fixa azul.
+    is_tdv = "TDV" in str(label).upper()
+    borda_calor = "" if is_tdv else f"border-left: 6px solid {color};"
+
     st.markdown(
         f"""
-        <div class="kpi-card {extra_class}">
+        <div class="kpi-card {extra_class}" style="{borda_calor}">
             <div class="kpi-label">{label}</div>
             <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
             <div class="kpi-note">{note}</div>
@@ -1649,35 +1798,42 @@ def enviar_alerta_robo_ecrv_off(
         pass
 
 def fig_layout(fig, height=520):
+    modo_escuro = str(globals().get("tema", "claro")).lower() == "escuro"
+
+    plot_bg = "#071931" if modo_escuro else "#FFFFFF"
+    fonte_cor = "#EAF4FF" if modo_escuro else "#202124"
+    fonte_muted = "#9DB7D2" if modo_escuro else "#5F6368"
+    grid_cor = "rgba(91, 166, 255, 0.16)" if modo_escuro else "#E0E0E0"
+
     fig.update_layout(
         height=height,
         autosize=True,
         margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#FFFFFF",
-        font=dict(color="#202124", family="Google Sans, Roboto, Arial"),
+        plot_bgcolor=plot_bg,
+        font=dict(color=fonte_cor, family="Google Sans, Roboto, Arial"),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.06,
             xanchor="left",
             x=0,
-            font=dict(size=11, color="#5F6368"),
+            font=dict(size=11, color=fonte_muted),
             bgcolor="rgba(255,255,255,0)",
         ),
 
         xaxis=dict(
-            gridcolor="#E0E0E0",
-            zerolinecolor="#E0E0E0",
-            tickfont=dict(color="#5F6368"),
+            gridcolor=grid_cor,
+            zerolinecolor=grid_cor,
+            tickfont=dict(color=fonte_muted),
             tickangle=-45,
             rangeslider=dict(visible=True),
         ),
 
         yaxis=dict(
-            gridcolor="#E0E0E0",
-            zerolinecolor="#E0E0E0",
-            tickfont=dict(color="#5F6368"),
+            gridcolor=grid_cor,
+            zerolinecolor=grid_cor,
+            tickfont=dict(color=fonte_muted),
         ),
     )
     return fig
@@ -1795,7 +1951,7 @@ def line_chart(df, cols, title):
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color="#202124"),
+            font=dict(size=16, color="#EAF4FF" if str(globals().get("tema", "claro")).lower() == "escuro" else "#202124"),
             y=0.98,
             x=0.01,
             xanchor="left",
@@ -1854,7 +2010,7 @@ def line_chart_comparativo_horario(
                 fig.update_layout(
                     title=dict(
                         text=f"{title} - sem horários coincidentes para comparação",
-                        font=dict(size=16, color="#202124"),
+                        font=dict(size=16, color="#EAF4FF" if str(globals().get("tema", "claro")).lower() == "escuro" else "#202124"),
                         y=0.98,
                         x=0.01,
                         xanchor="left",
@@ -1955,7 +2111,7 @@ def line_chart_comparativo_horario(
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color="#202124"),
+            font=dict(size=16, color="#EAF4FF" if str(globals().get("tema", "claro")).lower() == "escuro" else "#202124"),
             y=0.98,
             x=0.01,
             xanchor="left",
