@@ -225,6 +225,25 @@ button[kind="header"] {
     text-align: center;
 }
 
+/* Borda lateral visual dos cards: usa pseudo-elemento para não ser anulada pelo border geral do tema */
+.kpi-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card.kpi-border-left::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 7px;
+    background: var(--card-border-color, #1A73E8);
+    border-radius: 24px 0 0 24px;
+    z-index: 5;
+    pointer-events: none;
+}
+
 .kpi-card.kpi-tall {
     min-height: 231px;
     display: flex;
@@ -1704,13 +1723,16 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
     return status
 
 def render_card(label, value, color, note="Último registro", extra_class=""):
-    # Borda lateral acompanha a cor do próprio card.
-    # Para TDV, a cor permanece fixa em azul, portanto a borda também fica azul.
-    borda_calor = f"border-left: 6px solid {color} !important;"
+    """
+    Renderiza card KPI com faixa lateral esquerda.
+    A faixa usa pseudo-elemento CSS controlado por variável (--card-border-color),
+    evitando que a borda seja anulada pelo border geral do tema claro/escuro.
+    """
+    cor_borda = color or "#1A73E8"
 
     st.markdown(
         f"""
-        <div class="kpi-card {extra_class}" style="{borda_calor}">
+        <div class="kpi-card kpi-border-left {extra_class}" style="--card-border-color:{cor_borda}; border-left: 7px solid {cor_borda} !important;">
             <div class="kpi-label">{label}</div>
             <div class="kpi-value" style="color:{color};">{fmt_num(value)}</div>
             <div class="kpi-note">{note}</div>
@@ -1736,7 +1758,7 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     cor_borda_robos = "#188038" if all(s == "ON" for s in todos_status) else "#D93025"
 
     html = f"""
-    <div class="kpi-card kpi-robos-tall" style="border-left: 6px solid {cor_borda_robos} !important;">
+    <div class="kpi-card kpi-border-left kpi-robos-tall" style="--card-border-color:{cor_borda_robos}; border-left: 7px solid {cor_borda_robos} !important;">
         <div class="kpi-label">Robôs</div>
         <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; align-items:center; justify-items:center; width:100%;">
             <div style="font-size:16px; font-weight:600; line-height:1.45; white-space:nowrap;">
