@@ -478,6 +478,7 @@ CSS_ESCURO = """
 .stApp {
     background: radial-gradient(circle at top left, #0B3D91 0%, #061529 28%, #030A14 100%) !important;
     color: var(--md-text) !important;
+    font-family: Arial, sans-serif !important;
 }
 
 .hover-menu {
@@ -1815,6 +1816,7 @@ def fig_layout(fig, height=520):
     plot_bg = "#071931" if modo_escuro else "#FFFFFF"
     fonte_cor = "#EAF4FF" if modo_escuro else "#202124"
     fonte_muted = "#9DB7D2" if modo_escuro else "#5F6368"
+    fonte_family = "Arial" if modo_escuro else "Google Sans, Roboto, Arial"
     grid_cor = "rgba(91, 166, 255, 0.16)" if modo_escuro else "#E0E0E0"
 
     fig.update_layout(
@@ -1823,7 +1825,7 @@ def fig_layout(fig, height=520):
         margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor=plot_bg,
-        font=dict(color=fonte_cor, family="Google Sans, Roboto, Arial"),
+        font=dict(color=fonte_cor, family=fonte_family),
         legend=dict(
             orientation="h",
             yanchor="bottom",
