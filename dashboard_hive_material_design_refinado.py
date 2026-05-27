@@ -55,6 +55,7 @@ INTERVALO_VERIFICACAO_SEGUNDOS = 30
 
 st.set_page_config(
     page_title="Monitoramento e-CRV",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -67,24 +68,24 @@ st.set_page_config(
 CSS = """
 <style>
 :root {
-    --md-bg: #F6F8FC;
-    --md-surface: #FFFFFF;
-    --md-surface-container: #F8FAFD;
-    --md-surface-variant: #F1F3F4;
-    --md-primary: #1A73E8;
-    --md-primary-dark: #174EA6;
-    --md-text: #202124;
-    --md-muted: #5F6368;
-    --md-border: #E0E3EB;
-    --md-green: #188038;
-    --md-yellow: #F9AB00;
-    --md-red: #D93025;
-    --md-blue-soft: #E8F0FE;
-    --md-shadow: 0 1px 2px rgba(60,64,67,.10), 0 2px 6px rgba(60,64,67,.08);
+    --md-bg: #03070D;
+    --md-surface: #07131F;
+    --md-surface-container: #0A1B2D;
+    --md-surface-variant: #102A44;
+    --md-primary: #33C7FF;
+    --md-primary-dark: #1A73E8;
+    --md-text: #EAF4FF;
+    --md-muted: #9DB7D2;
+    --md-border: rgba(91, 166, 255, 0.24);
+    --md-green: #21D07A;
+    --md-yellow: #F6C343;
+    --md-red: #FF4D5E;
+    --md-blue-soft: rgba(51, 199, 255, 0.12);
+    --md-shadow: 0 14px 32px rgba(0, 0, 0, .34);
 }
 
 .stApp {
-    background: var(--md-bg);
+    background: radial-gradient(circle at top left, #0B3D91 0%, #061529 30%, #03070D 100%);
     color: var(--md-text);
     font-family: "Google Sans", "Roboto", Arial, sans-serif;
 }
@@ -129,10 +130,9 @@ button[kind="header"] {
     left: 0;
     width: 58px;
     height: 100vh;
-    background: #FFFFFF;
-    border-right: 1px solid #E0E3EB;
-    box-shadow: 0 1px 2px rgba(60,64,67,.10),
-                0 2px 6px rgba(60,64,67,.08);
+    background: rgba(3, 10, 20, .98);
+    border-right: 1px solid var(--md-border);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, .34);
     z-index: 999999999;
     transition: width 0.25s ease;
     overflow: hidden;
@@ -145,7 +145,7 @@ button[kind="header"] {
 
 .menu-icon {
     font-size: 24px;
-    color: #5F6368;
+    color: var(--md-muted);
     padding-left: 18px;
     margin-bottom: 28px;
 }
@@ -154,8 +154,8 @@ button[kind="header"] {
     opacity: 0;
     white-space: nowrap;
     font-size: 16px;
-    font-weight: 700;
-    color: #202124;
+    font-weight: 800;
+    color: var(--md-text);
     padding: 0 18px 18px 18px;
     transition: opacity 0.2s ease;
 }
@@ -169,9 +169,9 @@ button[kind="header"] {
     opacity: 0;
     white-space: nowrap;
     text-decoration: none !important;
-    color: #202124 !important;
+    color: var(--md-text) !important;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     padding: 13px 18px;
     transition: opacity 0.2s ease,
                 background 0.2s ease;
@@ -182,8 +182,8 @@ button[kind="header"] {
 }
 
 .menu-item:hover {
-    background: #E8F0FE;
-    color: #1A73E8 !important;
+    background: rgba(51, 199, 255, 0.12);
+    color: var(--md-primary) !important;
 }
 
 /* =========================
@@ -192,7 +192,7 @@ button[kind="header"] {
 
 .hive-title {
     font-size: 30px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--md-text);
     margin-bottom: 2px;
     letter-spacing: -.2px;
@@ -211,8 +211,8 @@ button[kind="header"] {
 }
 
 .kpi-card {
-    background: var(--md-surface);
-    border: none;
+    background: linear-gradient(160deg, rgba(14,49,95,.96), rgba(7,25,49,.96));
+    border: 1px solid var(--md-border);
     border-radius: 24px;
     padding: 20px;
     min-height: 148px;
@@ -226,7 +226,7 @@ button[kind="header"] {
 }
 
 .kpi-card.kpi-tall {
-    min-height: 231px;
+    min-height: 235px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -245,7 +245,7 @@ button[kind="header"] {
     font-size: 13px;
 }
 .kpi-card.kpi-robos-tall {
-    min-height: 231px;
+    min-height: 235px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -267,15 +267,16 @@ button[kind="header"] {
 .kpi-label {
     color: var(--md-muted);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
 }
 
 .kpi-value {
     font-size: 32px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.08;
     margin-top: 8px;
+    white-space: nowrap;
 }
 
 .kpi-note {
@@ -285,7 +286,8 @@ button[kind="header"] {
 }
 
 .panel {
-    background: var(--md-surface);
+    background: rgba(7, 25, 49, .92);
+    border: 1px solid var(--md-border);
     border-radius: 24px;
     padding: 20px 22px 16px 22px;
     box-shadow: var(--md-shadow);
@@ -294,7 +296,7 @@ button[kind="header"] {
 
 .panel-title {
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--md-text);
     margin-bottom: 10px;
 }
@@ -314,20 +316,21 @@ button[kind="header"] {
     width: 100%;
     table-layout: auto;
     border-collapse: collapse;
-    background: var(--md-surface);
+    background: rgba(7, 25, 49, .96);
     color: var(--md-text);
     font-size: 12px;
     border-radius: 18px;
     overflow: hidden;
     box-shadow: var(--md-shadow);
+    border: 1px solid var(--md-border);
 }
 
 .dark-table thead th {
-    background: var(--md-surface-variant);
+    background: #0E315F;
     color: var(--md-text);
     text-align: left;
     padding: 10px;
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 1px solid var(--md-border);
     vertical-align: middle;
     height: auto !important;
@@ -337,7 +340,7 @@ button[kind="header"] {
 
 .dark-table tbody td {
     padding: 9px;
-    border-bottom: 1px solid var(--md-border);
+    border-bottom: 1px solid rgba(91, 166, 255, 0.10);
     white-space: normal;
     word-break: normal;
     overflow-wrap: break-word;
@@ -412,6 +415,7 @@ button[kind="header"] {
     margin-top: 6px;
     display: block;
     position: relative;
+    border: 1px solid var(--md-border);
 }
 
 .table-scroll .dark-table {
@@ -419,6 +423,7 @@ button[kind="header"] {
     margin-bottom: 0 !important;
     border-radius: 0 !important;
     overflow: visible !important;
+    border: none !important;
 }
 
 .table-scroll .dark-table thead {
@@ -431,18 +436,50 @@ button[kind="header"] {
     position: sticky !important;
     top: 0 !important;
     z-index: 60 !important;
-    background: var(--md-surface-variant) !important;
+    background: #0E315F !important;
 }
 
-
 .dark-table tbody tr:nth-child(even) {
-    background: #FAFAFA;
+    background: rgba(10, 35, 68, .96);
 }
 
 .dark-table tbody tr:nth-child(odd) {
-    background: var(--md-surface);
+    background: rgba(7, 25, 49, .96);
 }
 
+.dark-table tbody tr:hover {
+    background: rgba(51, 199, 255, 0.10);
+}
+
+/* Componentes nativos do Streamlit */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div,
+[data-testid="stDateInput"] input,
+[data-testid="stTextInput"] input {
+    background-color: rgba(7, 25, 49, .96) !important;
+    color: var(--md-text) !important;
+    border-color: var(--md-border) !important;
+}
+
+label, .stSelectbox label, .stDateInput label {
+    color: var(--md-text) !important;
+}
+
+hr {
+    border-color: var(--md-border) !important;
+}
+
+.footer-note {
+    color: var(--md-muted);
+    font-size: 12px;
+    text-align: right;
+    margin-top: 8px;
+}
+
+[data-testid="column"] {
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+}
 </style>
 """
 
@@ -1077,37 +1114,37 @@ def cor_saude(valor: int, media, tipo: str):
         vermelho: acima de 25%
     """
     if media is None or media <= 0:
-        return "#FFFFFF"
+        return "#EAF4FF"
 
     valor = float(valor)
 
     if tipo == "positivo":
         if valor >= media:
-            return "#188038"
+            return "#21D07A"
         elif valor >= media * 0.75:
-            return "#F9AB00"
+            return "#F6C343"
         else:
-            return "#D93025"
+            return "#FF4D5E"
 
     if tipo == "negativo":
         if valor <= media:
-            return "#188038"
+            return "#21D07A"
         elif valor <= media * 1.25:
-            return "#F9AB00"
+            return "#F6C343"
         else:
-            return "#D93025"
+            return "#FF4D5E"
 
-    return "#FFFFFF"
+    return "#EAF4FF"
 
 def cor_criticas_minuto(valor):
     valor = int(valor or 0)
 
     if valor == 0:
-        return "#188038"  # verde
+        return "#21D07A"  # verde
     elif 1 <= valor <= 5:
-        return "#F9AB00"  # amarelo
+        return "#F6C343"  # amarelo
     else:
-        return "#D93025"  # vermelho
+        return "#FF4D5E"  # vermelho
 
 def obter_total_criticas_minuto(df_criticas: pd.DataFrame, tolerancia_minutos: int = 3) -> int:
     if df_criticas is None or df_criticas.empty:
@@ -1580,7 +1617,7 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
         return "🟢" if status == "ON" else "🔴"
 
     def cor(status):
-        return "#188038" if status == "ON" else "#D93025"
+        return "#21D07A" if status == "ON" else "#FF4D5E"
 
     html = f"""
     <div class="kpi-card kpi-robos-tall">
@@ -1652,30 +1689,30 @@ def fig_layout(fig, height=520):
         autosize=True,
         margin=dict(l=28, r=28, t=125, b=45),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#FFFFFF",
-        font=dict(color="#202124", family="Google Sans, Roboto, Arial"),
+        plot_bgcolor="rgba(7, 25, 49, 0.96)",
+        font=dict(color="#EAF4FF", family="Google Sans, Roboto, Arial"),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.06,
             xanchor="left",
             x=0,
-            font=dict(size=11, color="#5F6368"),
+            font=dict(size=11, color="#9DB7D2"),
             bgcolor="rgba(255,255,255,0)",
         ),
 
         xaxis=dict(
-            gridcolor="#E0E0E0",
-            zerolinecolor="#E0E0E0",
-            tickfont=dict(color="#5F6368"),
+            gridcolor="rgba(91, 166, 255, 0.16)",
+            zerolinecolor="rgba(91, 166, 255, 0.22)",
+            tickfont=dict(color="#9DB7D2"),
             tickangle=-45,
             rangeslider=dict(visible=True),
         ),
 
         yaxis=dict(
-            gridcolor="#E0E0E0",
-            zerolinecolor="#E0E0E0",
-            tickfont=dict(color="#5F6368"),
+            gridcolor="rgba(91, 166, 255, 0.16)",
+            zerolinecolor="rgba(91, 166, 255, 0.22)",
+            tickfont=dict(color="#9DB7D2"),
         ),
     )
     return fig
@@ -1734,13 +1771,13 @@ def line_chart(df, cols, title):
 
         nome_lower = col.lower()
         if "sucesso" in nome_lower:
-            cor = "#188038"
+            cor = "#21D07A"
         elif "incons" in nome_lower:
-            cor = "#D93025"
+            cor = "#FF4D5E"
         elif "fila" in nome_lower:
-            cor = "#F9AB00"
+            cor = "#F6C343"
         else:
-            cor = "#1A73E8"
+            cor = "#33C7FF"
 
         fig.add_trace(
             go.Scatter(
@@ -1793,7 +1830,7 @@ def line_chart(df, cols, title):
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color="#202124"),
+            font=dict(size=16, color="#EAF4FF"),
             y=0.98,
             x=0.01,
             xanchor="left",
@@ -1852,7 +1889,7 @@ def line_chart_comparativo_horario(
                 fig.update_layout(
                     title=dict(
                         text=f"{title} - sem horários coincidentes para comparação",
-                        font=dict(size=16, color="#202124"),
+                        font=dict(size=16, color="#EAF4FF"),
                         y=0.98,
                         x=0.01,
                         xanchor="left",
@@ -1868,12 +1905,12 @@ def line_chart_comparativo_horario(
     def cor_coluna(col):
         nome_lower = str(col).lower()
         if "sucesso" in nome_lower:
-            return "#188038"
+            return "#21D07A"
         if "incons" in nome_lower:
-            return "#D93025"
+            return "#FF4D5E"
         if "fila" in nome_lower:
-            return "#F9AB00"
-        return "#1A73E8"
+            return "#F6C343"
+        return "#33C7FF"
 
     y_max = 0
 
@@ -1953,7 +1990,7 @@ def line_chart_comparativo_horario(
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=16, color="#202124"),
+            font=dict(size=16, color="#EAF4FF"),
             y=0.98,
             x=0.01,
             xanchor="left",
@@ -2155,14 +2192,14 @@ def render_mensagem_tabela(texto: str):
     st.markdown(
         f"""
         <div style="
-            background: #FFFFFF;
-            border: 1px solid #DADCE0;
+            background: rgba(7, 25, 49, .96);
+            border: 1px solid rgba(91, 166, 255, 0.24);
             border-radius: 18px;
             padding: 12px 14px;
-            color: #5F6368;
+            color: #9DB7D2;
             font-size: 13px;
             font-weight: 600;
-            box-shadow: 0 1px 2px rgba(60,64,67,.10), 0 2px 6px rgba(60,64,67,.08);
+            box-shadow: 0 14px 32px rgba(0,0,0,.24), 0 2px 6px rgba(60,64,67,.08);
         ">{texto}</div>
         """,
         unsafe_allow_html=True,
@@ -2647,10 +2684,7 @@ if pagina == "Monitoramento atual":
     # CARDS
     # =========================
 
-    cols = st.columns(
-        5,
-        vertical_alignment="top"
-    )
+    cols = st.columns(5)
 
     with cols[0]:
         render_card(
@@ -2668,7 +2702,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Fila TDV",
             fila_tdv,
-            "#1A73E8",
+            cor_saude(fila_tdv, None, "negativo"),
             f"Último registro: {hora_coleta}",
         )
 
@@ -2688,7 +2722,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Sucesso TDV",
             sucesso_tdv,
-            "#1A73E8",
+            cor_saude(sucesso_tdv, None, "positivo"),
             f"Último registro: {hora_coleta}",
         )
 
@@ -2708,13 +2742,13 @@ if pagina == "Monitoramento atual":
         render_card(
             "Inconsistências TDV",
             incons_tdv,
-            "#1A73E8",
+            cor_saude(incons_tdv, None, "negativo"),
             f"Último registro: {hora_coleta}",
         )
 
     with cols[3]:
         render_card(
-            "Automatizado e-CRV",
+            "Automatizado",
             automatizado,
             cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
             f"Último registro: {hora_coleta}",
@@ -2723,7 +2757,7 @@ if pagina == "Monitoramento atual":
             "Total",
             total_sucesso,
             "#1A73E8",
-            "Soma Transferências, 0KM e TDV",
+            "Sucesso Transferências + Sucesso 0KM",
         )
         render_card(
             "TDV (Hora)",
@@ -2982,7 +3016,7 @@ if pagina == "Monitoramento atual":
 
     for titulo_servico, chave_servico in servicos_tabelas:
         st.markdown(
-            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            f'<div style="font-size:13px; font-weight:700; color:#EAF4FF; margin:14px 0 8px 0;">{titulo_servico}</div>',
             unsafe_allow_html=True,
         )
         df_serv = tabela_historico_servico(df_hist_hoje, chave_servico)
@@ -3228,7 +3262,7 @@ elif pagina == "Histórico monitoramento":
         ("Transferências", "Transferências"),
     ]:
         st.markdown(
-            f'<div style="font-size:13px; font-weight:700; color:#202124; margin:14px 0 8px 0;">{titulo_servico}</div>',
+            f'<div style="font-size:13px; font-weight:700; color:#EAF4FF; margin:14px 0 8px 0;">{titulo_servico}</div>',
             unsafe_allow_html=True,
         )
 
