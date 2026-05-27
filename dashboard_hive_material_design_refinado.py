@@ -2283,7 +2283,7 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     )
     
     out = out.drop_duplicates(
-        subset=["_chave_servico", "Descrição agrupada"],
+        subset=["_chave_servico", "Descrição"]
         keep="last"
     )
     
