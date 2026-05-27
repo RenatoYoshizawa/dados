@@ -2725,7 +2725,7 @@ if pagina == "Monitoramento atual":
             "Total",
             total_sucesso,
             "#1A73E8",
-            "Sucesso Transferências + Sucesso 0KM",
+            "Soma das Transferências, 0KM e TDV"
         )
         render_card(
             "TDV (Hora)",
