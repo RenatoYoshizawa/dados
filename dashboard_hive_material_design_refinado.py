@@ -48,7 +48,7 @@ ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
-JANELA_STOP_MINUTOS = 1440  # mantém STOP válido por até 24h, até haver sucesso posterior
+JANELA_STOP_MINUTOS = 30  # considera STOPs dos últimos 30 minutos
 
 
 # =========================
@@ -1489,39 +1489,57 @@ def _servicos_para_chaves(valor: str) -> list[str]:
 
     txt = str(valor or "").lower().strip()
 
+    # Remove acentos para padronizar:
+    # transferência -> transferencia
+    # município -> municipio
+    txt_norm = unicodedata.normalize("NFKD", txt)
+    txt_norm = "".join(
+        c for c in txt_norm
+        if not unicodedata.combining(c)
+    )
+
     servicos = []
 
+    # 0KM / Primeiro Registro
     if (
-        "primeiro" in txt
-        or "0km" in txt
-        or "0 km" in txt
-        or txt == "pr"
+        "primeiro registro" in txt_norm
+        or "primeiro" in txt_norm
+        or "1-primeiro" in txt_norm
+        or "1 - primeiro" in txt_norm
+        or "0km" in txt_norm
+        or "0 km" in txt_norm
+        or txt_norm == "pr"
     ):
         servicos.append("0KM")
 
+    # Transferência de Proprietário
     if (
-        "transferência proprietário" in txt
-        or "transferencia proprietario" in txt
-        or "proprietário" in txt
-        or "proprietario" in txt
-        or "tp" in txt
+        "transferencia de proprietario" in txt_norm
+        or "transferencia proprietario" in txt_norm
+        or "proprietario" in txt_norm
+        or "2-transferencia" in txt_norm
+        or "2 - transferencia" in txt_norm
+        or txt_norm == "tp"
     ):
         servicos.append("Transferência 2")
 
+    # Transferência de Município/Estado
     if (
-        "transferência município" in txt
-        or "transferencia municipio" in txt
-        or "transferência estado" in txt
-        or "transferencia estado" in txt
-        or "município" in txt
-        or "municipio" in txt
-        or "estado" in txt
-        or "tm" in txt
-        or "te" in txt
+        "transferencia de municipio" in txt_norm
+        or "transferencia municipio" in txt_norm
+        or "transferencia de estado" in txt_norm
+        or "transferencia estado" in txt_norm
+        or "municipio" in txt_norm
+        or "estado" in txt_norm
+        or "3-transferencia" in txt_norm
+        or "3 - transferencia" in txt_norm
+        or txt_norm == "tm"
+        or txt_norm == "te"
     ):
         servicos.append("Transferência 3")
 
-    return servicos
+    # Remove duplicidades preservando a ordem.
+    return list(dict.fromkeys(servicos))
     
 
 def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[str]:
@@ -1552,7 +1570,7 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
 
         tmp = df0.copy()
 
-        # Apenas linhas com STOP = SIM
+        # Apenas linhas com STOP = SIM.
         tmp = tmp[
             tmp[col_stop].astype(str).str.upper().str.strip() == "SIM"
         ].copy()
@@ -1560,7 +1578,7 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
         if tmp.empty:
             continue
 
-        # Data do registro
+        # Data do registro.
         if col_data:
             tmp["_data"] = pd.to_datetime(
                 tmp[col_data],
@@ -1572,6 +1590,7 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
 
         agora = pd.Timestamp.now()
 
+        # Considera somente STOPs dentro da janela configurada.
         tmp = tmp[
             tmp["_data"].notna()
             & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= JANELA_STOP_MINUTOS)
@@ -1603,109 +1622,7 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
 
     df_reg = pd.DataFrame(registros)
 
-    # Mantém somente o STOP mais recente de cada serviço
-    df_reg = (
-        df_reg
-        .sort_values("data")
-        .drop_duplicates(subset=["servico"], keep="last")
-    )
-
-    return set(df_reg["servico"].tolist())
-
-
-    fontes = []
-
-    if df_criticas is not None and not df_criticas.empty:
-        fontes.append(df_criticas)
-
-    if df_hist is not None and not df_hist.empty:
-        fontes.append(df_hist)
-
-    registros = []
-
-    for df0 in fontes:
-
-        col_stop = _coluna_existente(df0, ["STOP PROCESSO ativado?"])
-        col_data = _coluna_existente(df0, ["Data/Hora", "Data Hora", "Data"])
-        col_servico = _coluna_existente(df0, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
-        col_desligados = _coluna_existente(df0, ["Serviços desligados", "Servicos desligados"])
-
-        if not col_stop:
-            continue
-
-        tmp = df0.copy()
-
-        # Apenas linhas com STOP = SIM
-        tmp = tmp[
-            tmp[col_stop].astype(str).str.upper().str.strip() == "SIM"
-        ].copy()
-
-        if tmp.empty:
-            continue
-
-        # Data do registro
-        if col_data:
-            tmp["_data"] = pd.to_datetime(
-                tmp[col_data],
-                dayfirst=True,
-                errors="coerce"
-            )
-        else:
-            tmp["_data"] = pd.Timestamp.now()
-
-        agora = pd.Timestamp.now()
-        tmp = tmp[
-            tmp["_data"].notna()
-            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= 20)
-        ].copy()
-
-        if tmp.empty:
-            continue
-
-        for _, row in tmp.iterrows():
-
-            textos = []
-
-            if col_servico:
-                textos.append(str(row.get(col_servico, "")))
-
-            if col_desligados:
-                textos.append(str(row.get(col_desligados, "")))
-
-            combinado = " | ".join(textos).lower()
-
-            chave = None
-
-            if (
-                "primeiro" in combinado
-                or "0km" in combinado
-                or "0 km" in combinado
-            ):
-                chave = "0KM"
-
-            elif (
-                "propriet" in combinado
-            ):
-                chave = "Transferência 2"
-
-            elif (
-                "estado" in combinado
-                or "munic" in combinado
-            ):
-                chave = "Transferência 3"
-
-            if chave:
-                registros.append({
-                    "servico": chave,
-                    "data": row["_data"]
-                })
-
-    if not registros:
-        return set()
-
-    df_reg = pd.DataFrame(registros)
-
-    # Mantém somente o STOP mais recente de cada serviço
+    # Mantém somente o STOP mais recente de cada serviço.
     df_reg = (
         df_reg
         .sort_values("data")
@@ -1769,62 +1686,6 @@ def _ultimo_stop_servico(df_criticas: pd.DataFrame, df_hist: pd.DataFrame, chave
             combinado = " | ".join(textos)
 
             if chave_servico in _servicos_para_chaves(combinado):
-                registros.append(row["_data"])
-
-    if not registros:
-        return None
-
-    return max(registros)
-
-
-    if df_criticas is not None and not df_criticas.empty:
-        fontes.append(df_criticas)
-
-    if df_hist is not None and not df_hist.empty:
-        fontes.append(df_hist)
-
-    registros = []
-
-    for df0 in fontes:
-        col_stop = _coluna_existente(df0, ["STOP PROCESSO ativado?"])
-        col_data = _coluna_existente(df0, ["Data/Hora", "Data Hora", "Data"])
-        col_servico = _coluna_existente(df0, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
-        col_desligados = _coluna_existente(df0, ["Serviços desligados", "Servicos desligados"])
-
-        if not col_stop or not col_data:
-            continue
-
-        tmp = df0[
-            df0[col_stop].astype(str).str.upper().str.strip() == "SIM"
-        ].copy()
-
-        if tmp.empty:
-            continue
-
-        tmp["_data"] = pd.to_datetime(tmp[col_data], dayfirst=True, errors="coerce")
-
-        agora = pd.Timestamp.now()
-        tmp = tmp[
-            tmp["_data"].notna()
-            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= 20)
-        ].copy()
-
-        if tmp.empty:
-            continue
-
-        for _, row in tmp.iterrows():
-            textos = []
-
-            if col_servico:
-                textos.append(str(row.get(col_servico, "")))
-
-            if col_desligados:
-                textos.append(str(row.get(col_desligados, "")))
-
-            combinado = " | ".join(textos)
-            chave = _servico_para_chave(combinado)
-
-            if chave == chave_servico and not pd.isna(row["_data"]):
                 registros.append(row["_data"])
 
     if not registros:
