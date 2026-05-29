@@ -1739,6 +1739,7 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
     }
 
     servicos_com_stop = _servicos_stop_sim(df_criticas, df_hist)
+    st.write("DEBUG - Serviços com STOP:", servicos_com_stop)
 
     # Primeiro marca OFF pelos STOPs encontrados.
     for servico in servicos_com_stop:
