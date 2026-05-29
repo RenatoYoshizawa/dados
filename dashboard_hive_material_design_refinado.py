@@ -47,6 +47,8 @@ META_LOCAL = CACHE_DIR / "github_meta.json"
 ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
+TEMPO_MINIMO_OFF_MINUTOS = 15
+JANELA_STOP_MINUTOS = 1440  # mantém STOP válido por até 24h, até haver sucesso posterior
 
 
 # =========================
@@ -1478,11 +1480,138 @@ def _servico_para_chave(valor: str) -> str | None:
 
     return None
     
+def _servicos_para_chaves(valor: str) -> list[str]:
+    """
+    Identifica todos os serviços citados no texto.
+    Necessário porque a coluna 'Serviços desligados' pode trazer
+    0KM, Transferência 2 e Transferência 3 na mesma célula.
+    """
+
+    txt = str(valor or "").lower().strip()
+
+    servicos = []
+
+    if (
+        "primeiro" in txt
+        or "0km" in txt
+        or "0 km" in txt
+        or txt == "pr"
+    ):
+        servicos.append("0KM")
+
+    if (
+        "transferência proprietário" in txt
+        or "transferencia proprietario" in txt
+        or "proprietário" in txt
+        or "proprietario" in txt
+        or "tp" in txt
+    ):
+        servicos.append("Transferência 2")
+
+    if (
+        "transferência município" in txt
+        or "transferencia municipio" in txt
+        or "transferência estado" in txt
+        or "transferencia estado" in txt
+        or "município" in txt
+        or "municipio" in txt
+        or "estado" in txt
+        or "tm" in txt
+        or "te" in txt
+    ):
+        servicos.append("Transferência 3")
+
+    return servicos
+    
+
 def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[str]:
     """
-    Considera somente STOPs recentes (últimos 20 minutos)
-    e identifica os serviços desligados.
+    Identifica serviços com STOP PROCESSO ativado = SIM.
+    Mantém o STOP dentro da janela configurada em JANELA_STOP_MINUTOS.
     """
+
+    fontes = []
+
+    if df_criticas is not None and not df_criticas.empty:
+        fontes.append(df_criticas)
+
+    if df_hist is not None and not df_hist.empty:
+        fontes.append(df_hist)
+
+    registros = []
+
+    for df0 in fontes:
+
+        col_stop = _coluna_existente(df0, ["STOP PROCESSO ativado?"])
+        col_data = _coluna_existente(df0, ["Data/Hora", "Data Hora", "Data"])
+        col_servico = _coluna_existente(df0, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+        col_desligados = _coluna_existente(df0, ["Serviços desligados", "Servicos desligados"])
+
+        if not col_stop:
+            continue
+
+        tmp = df0.copy()
+
+        # Apenas linhas com STOP = SIM
+        tmp = tmp[
+            tmp[col_stop].astype(str).str.upper().str.strip() == "SIM"
+        ].copy()
+
+        if tmp.empty:
+            continue
+
+        # Data do registro
+        if col_data:
+            tmp["_data"] = pd.to_datetime(
+                tmp[col_data],
+                dayfirst=True,
+                errors="coerce"
+            )
+        else:
+            tmp["_data"] = pd.Timestamp.now()
+
+        agora = pd.Timestamp.now()
+
+        tmp = tmp[
+            tmp["_data"].notna()
+            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= JANELA_STOP_MINUTOS)
+        ].copy()
+
+        if tmp.empty:
+            continue
+
+        for _, row in tmp.iterrows():
+
+            textos = []
+
+            if col_servico:
+                textos.append(str(row.get(col_servico, "")))
+
+            if col_desligados:
+                textos.append(str(row.get(col_desligados, "")))
+
+            combinado = " | ".join(textos)
+
+            for chave in _servicos_para_chaves(combinado):
+                registros.append({
+                    "servico": chave,
+                    "data": row["_data"]
+                })
+
+    if not registros:
+        return set()
+
+    df_reg = pd.DataFrame(registros)
+
+    # Mantém somente o STOP mais recente de cada serviço
+    df_reg = (
+        df_reg
+        .sort_values("data")
+        .drop_duplicates(subset=["servico"], keep="last")
+    )
+
+    return set(df_reg["servico"].tolist())
+
 
     fontes = []
 
@@ -1612,6 +1741,66 @@ def _ultimo_stop_servico(df_criticas: pd.DataFrame, df_hist: pd.DataFrame, chave
         if tmp.empty:
             continue
 
+        tmp["_data"] = pd.to_datetime(
+            tmp[col_data],
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        agora = pd.Timestamp.now()
+
+        tmp = tmp[
+            tmp["_data"].notna()
+            & ((agora - tmp["_data"]).dt.total_seconds() / 60 <= JANELA_STOP_MINUTOS)
+        ].copy()
+
+        if tmp.empty:
+            continue
+
+        for _, row in tmp.iterrows():
+            textos = []
+
+            if col_servico:
+                textos.append(str(row.get(col_servico, "")))
+
+            if col_desligados:
+                textos.append(str(row.get(col_desligados, "")))
+
+            combinado = " | ".join(textos)
+
+            if chave_servico in _servicos_para_chaves(combinado):
+                registros.append(row["_data"])
+
+    if not registros:
+        return None
+
+    return max(registros)
+
+
+    if df_criticas is not None and not df_criticas.empty:
+        fontes.append(df_criticas)
+
+    if df_hist is not None and not df_hist.empty:
+        fontes.append(df_hist)
+
+    registros = []
+
+    for df0 in fontes:
+        col_stop = _coluna_existente(df0, ["STOP PROCESSO ativado?"])
+        col_data = _coluna_existente(df0, ["Data/Hora", "Data Hora", "Data"])
+        col_servico = _coluna_existente(df0, ["Serviço", "Servico", "Tipo Serviço", "Tipo Servico"])
+        col_desligados = _coluna_existente(df0, ["Serviços desligados", "Servicos desligados"])
+
+        if not col_stop or not col_data:
+            continue
+
+        tmp = df0[
+            df0[col_stop].astype(str).str.upper().str.strip() == "SIM"
+        ].copy()
+
+        if tmp.empty:
+            continue
+
         tmp["_data"] = pd.to_datetime(tmp[col_data], dayfirst=True, errors="coerce")
 
         agora = pd.Timestamp.now()
@@ -1676,10 +1865,110 @@ def _existe_full_posterior_ao_stop(df_criticas: pd.DataFrame, df_hist: pd.DataFr
 def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: pd.DataFrame = None):
     """
     Regra:
-    - OFF: quando houver STOP PROCESSO ativado = SIM para o serviço.
-    - ON: quando houver novo ciclo de monitoramento posterior ao STOP
-      com aumento no contador de inconsistência do serviço.
+    - OFF imediatamente quando houver STOP PROCESSO ativado = SIM para o serviço.
+    - Permanece OFF por pelo menos 15 minutos.
+    - Após 15 minutos, volta ON somente se houver aumento em Sucesso
+      em ciclo posterior ao STOP.
     """
+
+    status = {
+        "0KM": "ON",
+        "Transferência 2": "ON",
+        "Transferência 3": "ON",
+    }
+
+    servicos_com_stop = _servicos_stop_sim(df_criticas, df_hist)
+
+    # Primeiro marca OFF pelos STOPs encontrados.
+    for servico in servicos_com_stop:
+        status[servico] = "OFF"
+
+    if not servicos_com_stop:
+        return status
+
+    if df_monitor is None or df_monitor.empty:
+        return status
+
+    dfm = normalizar_coluna_data_para_date(df_monitor)
+
+    if "Data/Hora" not in dfm.columns:
+        return status
+
+    dfm["_data_hora_monitor"] = pd.to_datetime(
+        dfm["Data/Hora"],
+        dayfirst=True,
+        errors="coerce",
+        format="mixed",
+    )
+
+    dfm = (
+        dfm
+        .dropna(subset=["_data_hora_monitor"])
+        .sort_values("_data_hora_monitor")
+        .copy()
+    )
+
+    if dfm.empty:
+        return status
+
+    def houve_sucesso_apos_15_min(chave_servico: str, coluna_sucesso: str) -> bool:
+        ultimo_stop = _ultimo_stop_servico(df_criticas, df_hist, chave_servico)
+
+        if ultimo_stop is None:
+            return False
+
+        limite_retorno = ultimo_stop + pd.Timedelta(minutes=TEMPO_MINIMO_OFF_MINUTOS)
+
+        # Antes dos 15 minutos, mantém OFF obrigatoriamente.
+        if pd.Timestamp.now() < limite_retorno:
+            return False
+
+        if coluna_sucesso not in dfm.columns:
+            return False
+
+        # Usa somente ciclos posteriores ao STOP, mas calcula a diferença
+        # antes de filtrar os registros após 15 minutos.
+        # Assim, o primeiro ciclo pós-15 compara contra o ciclo anterior,
+        # inclusive o ciclo executado durante o STOP.
+        tmp = dfm[
+            dfm["_data_hora_monitor"] > ultimo_stop
+        ].copy()
+
+        if len(tmp) < 2:
+            return False
+
+        tmp[coluna_sucesso] = pd.to_numeric(
+            tmp[coluna_sucesso],
+            errors="coerce"
+        ).fillna(0)
+
+        tmp["_dif_sucesso"] = tmp[coluna_sucesso].diff().fillna(0)
+
+        tmp_pos_15 = tmp[
+            tmp["_data_hora_monitor"] >= limite_retorno
+        ].copy()
+
+        if tmp_pos_15.empty:
+            return False
+
+        return tmp_pos_15["_dif_sucesso"].gt(0).any()
+
+    # 0KM volta ON se, após 15 minutos, houver aumento em Sucesso 0km.
+    if status["0KM"] == "OFF":
+        if houve_sucesso_apos_15_min("0KM", "Sucesso 0km"):
+            status["0KM"] = "ON"
+
+    # Transferência 2 e 3 usam a coluna agregada Sucesso 2 e 3.
+    if status["Transferência 2"] == "OFF":
+        if houve_sucesso_apos_15_min("Transferência 2", "Sucesso 2 e 3"):
+            status["Transferência 2"] = "ON"
+
+    if status["Transferência 3"] == "OFF":
+        if houve_sucesso_apos_15_min("Transferência 3", "Sucesso 2 e 3"):
+            status["Transferência 3"] = "ON"
+
+    return status
+
 
     status = {
         "0KM": "ON",
