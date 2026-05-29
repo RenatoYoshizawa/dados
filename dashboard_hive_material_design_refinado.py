@@ -48,7 +48,7 @@ ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
-JANELA_STOP_MINUTOS = 30  # considera STOPs dos últimos 30 minutos
+JANELA_STOP_MINUTOS = 120  # considera STOPs dos últimos 30 minutos
 
 
 # =========================
