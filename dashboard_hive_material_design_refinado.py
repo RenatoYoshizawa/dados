@@ -14,6 +14,28 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 
+# =========================
+# DATA/HORA PADRÃO DO PAINEL
+# =========================
+
+FUSO_HORARIO_PADRAO = "America/Sao_Paulo"
+
+def agora_sao_paulo() -> pd.Timestamp:
+    """
+    Retorna a data/hora atual no fuso de São Paulo, sem timezone.
+
+    O RPA grava as planilhas em horário local de São Paulo.
+    No Streamlit Cloud/servidores Linux, datetime.now() e pd.Timestamp.now()
+    podem usar UTC, causando filtros do dia e janelas de tempo incorretas
+    principalmente à noite.
+    """
+    return pd.Timestamp.now(tz=FUSO_HORARIO_PADRAO).tz_localize(None)
+
+def datetime_sao_paulo() -> datetime:
+    """Retorna datetime nativo no fuso de São Paulo, sem timezone."""
+    return agora_sao_paulo().to_pydatetime()
+
+
 # =========================#
 # CONFIGURAÇÕES
 # =========================
@@ -32,8 +54,8 @@ WEBHOOK_TEAMS = st.secrets.get(
 GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
 GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
-GITHUB_ARQ_MONITORAMENTO_HIST = f"historico/Monitoramento_{datetime.now().strftime('%Y_%m')}.csv"
-GITHUB_ARQ_INCONSISTENCIAS_HIST = f"historico/Inconsistencias_{datetime.now().strftime('%Y_%m')}.csv"
+GITHUB_ARQ_MONITORAMENTO_HIST = f"historico/Monitoramento_{agora_sao_paulo().strftime('%Y_%m')}.csv"
+GITHUB_ARQ_INCONSISTENCIAS_HIST = f"historico/Inconsistencias_{agora_sao_paulo().strftime('%Y_%m')}.csv"
 
 CACHE_DIR = Path("/tmp/monitoramento_ecrv_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -48,7 +70,7 @@ ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
-JANELA_STOP_MINUTOS = 420  # considera STOPs dos últimos 120 minutos
+JANELA_STOP_MINUTOS = 420  # considera STOPs dos últimos 420 minutos
 
 
 # =========================
@@ -802,7 +824,7 @@ def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigato
     tmp.write_bytes(conteudo)
     tmp.replace(destino)
 
-    downloaded_at = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    downloaded_at = agora_sao_paulo().strftime("%d/%m/%Y %H:%M:%S")
     meta[caminho_repo] = {
         "sha": sha_remoto,
         "downloaded_at": downloaded_at,
@@ -1326,7 +1348,7 @@ def obter_total_criticas_minuto(df_criticas: pd.DataFrame, tolerancia_minutos: i
             return 0
 
         ultima_data = dfc.iloc[-1]["_data"]
-        minutos = (pd.Timestamp.now() - ultima_data).total_seconds() / 60
+        minutos = (agora_sao_paulo() - ultima_data).total_seconds() / 60
 
         if minutos > tolerancia_minutos:
             return 0
@@ -1586,9 +1608,9 @@ def _servicos_stop_sim(df_criticas: pd.DataFrame, df_hist: pd.DataFrame) -> set[
                 errors="coerce"
             )
         else:
-            tmp["_data"] = pd.Timestamp.now()
+            tmp["_data"] = agora_sao_paulo()
 
-        agora = pd.Timestamp.now()
+        agora = agora_sao_paulo()
 
         # Considera somente STOPs dentro da janela configurada.
         tmp = tmp[
@@ -1664,7 +1686,7 @@ def _ultimo_stop_servico(df_criticas: pd.DataFrame, df_hist: pd.DataFrame, chave
             errors="coerce"
         )
 
-        agora = pd.Timestamp.now()
+        agora = agora_sao_paulo()
 
         tmp = tmp[
             tmp["_data"].notna()
@@ -1782,7 +1804,7 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
         limite_retorno = ultimo_stop + pd.Timedelta(minutes=TEMPO_MINIMO_OFF_MINUTOS)
 
         # Antes dos 15 minutos, mantém OFF obrigatoriamente.
-        if pd.Timestamp.now() < limite_retorno:
+        if agora_sao_paulo() < limite_retorno:
             return False
 
         if coluna_sucesso not in dfm.columns:
@@ -2582,7 +2604,7 @@ def filtrar_historico_por_dia(df):
     if df.empty:
         return pd.DataFrame()
 
-    hoje = datetime.now().date()
+    hoje = agora_sao_paulo().date()
 
     return (
         df[df["_data"].dt.date == hoje]
@@ -2933,7 +2955,7 @@ df = adicionar_quantidade_processos(df)
 
 ultima = df.iloc[-1]
 hora_coleta = str(ultima["Horário"]) if "Horário" in df.columns else "-"
-ultima_modificacao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+ultima_modificacao = agora_sao_paulo().strftime("%d/%m/%Y %H:%M:%S")
 
 # Considera o robô de monitoramento OFF quando o arquivo principal
 # fica mais de 15 minutos sem nova atualização no GitHub/cache.
@@ -2944,7 +2966,7 @@ minutos_sem_atualizacao = None
 try:
     if ultima_sync_github:
         dt_sync = datetime.strptime(ultima_sync_github, "%d/%m/%Y %H:%M:%S")
-        minutos_sem_atualizacao = (datetime.now() - dt_sync).total_seconds() / 60
+        minutos_sem_atualizacao = (datetime_sao_paulo() - dt_sync).total_seconds() / 60
 
         if minutos_sem_atualizacao > 15:
             robo_monitoramento_online = False
