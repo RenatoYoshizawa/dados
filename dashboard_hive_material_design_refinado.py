@@ -1739,15 +1739,7 @@ def status_robos(df_monitor: pd.DataFrame, df_criticas: pd.DataFrame, df_hist: p
     }
 
     servicos_com_stop = _servicos_stop_sim(df_criticas, df_hist)
-    st.write("DEBUG - Serviços com STOP:", servicos_com_stop)
-    st.write("DEBUG - Colunas df_criticas:", list(df_criticas.columns) if df_criticas is not None else None)
-    st.write("DEBUG - Colunas df_hist:", list(df_hist.columns) if df_hist is not None else None)
-    
-    if df_criticas is not None and not df_criticas.empty:
-        st.write("DEBUG - Últimas linhas críticas:", df_criticas.tail(10))
-    
-    if df_hist is not None and not df_hist.empty:
-        st.write("DEBUG - Últimas linhas histórico:", df_hist.tail(10))
+
 
     # Primeiro marca OFF pelos STOPs encontrados.
     for servico in servicos_com_stop:
