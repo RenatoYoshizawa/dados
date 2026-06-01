@@ -54,8 +54,28 @@ WEBHOOK_TEAMS = st.secrets.get(
 GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
 GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
-GITHUB_ARQ_MONITORAMENTO_HIST = f"historico/Monitoramento_{agora_sao_paulo().strftime('%Y_%m')}.csv"
-GITHUB_ARQ_INCONSISTENCIAS_HIST = f"historico/Inconsistencias_{agora_sao_paulo().strftime('%Y_%m')}.csv"
+
+# Quantidade de meses que serão exibidos na página de Histórico.
+# Exemplo: 6 = mês atual + 5 meses anteriores.
+QUANTIDADE_MESES_HISTORICO = 6
+
+def caminhos_historico_ultimos_meses(prefixo: str, quantidade_meses: int = QUANTIDADE_MESES_HISTORICO):
+    """
+    Monta os caminhos dos arquivos mensais de histórico dos últimos meses.
+
+    Exemplo, em junho/2026 e quantidade_meses=6:
+    historico/Monitoramento_2026_01.csv até historico/Monitoramento_2026_06.csv.
+    """
+
+    hoje = agora_sao_paulo().replace(day=1)
+    caminhos = []
+
+    for i in range(quantidade_meses - 1, -1, -1):
+        mes_ref = hoje - pd.DateOffset(months=i)
+        ano_mes = mes_ref.strftime("%Y_%m")
+        caminhos.append(f"historico/{prefixo}_{ano_mes}.csv")
+
+    return caminhos
 
 CACHE_DIR = Path("/tmp/monitoramento_ecrv_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -839,6 +859,51 @@ def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigato
         "downloaded_at": downloaded_at,
     }
 
+def carregar_historico_multimes(prefixo: str, obrigatorio: bool = False) -> pd.DataFrame:
+    """
+    Carrega o histórico dos últimos meses, conforme QUANTIDADE_MESES_HISTORICO,
+    juntando os CSVs disponíveis em um único DataFrame.
+    """
+
+    dfs = []
+
+    for caminho_repo in caminhos_historico_ultimos_meses(prefixo):
+        nome_local = caminho_repo.replace("/", "_").replace(".csv", "")
+        destino_local = CACHE_DIR / f"{nome_local}.csv"
+
+        try:
+            caminho_local, _ = baixar_github_se_houver_alteracao(
+                caminho_repo,
+                destino_local,
+                obrigatorio=False,
+            )
+
+            if caminho_local and Path(caminho_local).exists():
+                df_tmp = carregar_csv_historico(
+                    str(caminho_local),
+                    Path(caminho_local).stat().st_mtime,
+                )
+
+                if df_tmp is not None and not df_tmp.empty:
+                    dfs.append(df_tmp)
+
+        except FileNotFoundError:
+            continue
+
+        except Exception:
+            continue
+
+    if not dfs:
+        if obrigatorio:
+            raise FileNotFoundError(
+                f"Nenhum arquivo de histórico encontrado para {prefixo}."
+            )
+        return pd.DataFrame()
+
+    df_final = pd.concat(dfs, ignore_index=True)
+    df_final = normalizar_coluna_data_para_date(df_final)
+
+    return df_final
 # =========================
 # FUNÇÕES AUXILIARES
 # =========================
@@ -3393,39 +3458,21 @@ elif pagina == "Histórico monitoramento":
     )
 
     try:
-        caminho_mon_hist, _ = baixar_github_se_houver_alteracao(
-            GITHUB_ARQ_MONITORAMENTO_HIST,
-            ARQ_LOCAL_MONITORAMENTO_HIST,
+        df_mon_hist = carregar_historico_multimes(
+            "Monitoramento",
             obrigatorio=True,
         )
-
-        df_mon_hist = carregar_csv_historico(
-            str(caminho_mon_hist),
-            Path(caminho_mon_hist).stat().st_mtime,
-        )
-
-        df_mon_hist = normalizar_coluna_data_para_date(df_mon_hist)
-
+    
     except Exception as e:
-        st.error(f"Erro ao carregar histórico mensal de monitoramento: {e}")
+        st.error(f"Erro ao carregar histórico de monitoramento: {e}")
         st.stop()
 
     try:
-        caminho_inc_hist, meta_inc_hist = baixar_github_se_houver_alteracao(
-            GITHUB_ARQ_INCONSISTENCIAS_HIST,
-            ARQ_LOCAL_INCONSISTENCIAS_HIST,
+        df_inc_hist = carregar_historico_multimes(
+            "Inconsistencias",
             obrigatorio=False,
         )
-
-        if caminho_inc_hist and Path(caminho_inc_hist).exists():
-            df_inc_hist = carregar_csv_historico(
-                str(caminho_inc_hist),
-                Path(caminho_inc_hist).stat().st_mtime,
-            )
-            df_inc_hist = normalizar_coluna_data_para_date(df_inc_hist)
-        else:
-            df_inc_hist = pd.DataFrame()
-
+    
     except Exception as e:
         df_inc_hist = pd.DataFrame()
         st.warning(f"Histórico de inconsistências não carregado: {e}")
