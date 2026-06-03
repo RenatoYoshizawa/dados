@@ -1950,7 +1950,49 @@ def _coluna_existente(df: pd.DataFrame, alternativas: list[str]) -> str | None:
             return col
     return None
 
+def _descricao_historico_valida(valor) -> bool:
+    """
+    Remove cabeçalhos/valores inválidos que entraram no histórico como inconsistência.
+    Ex.: DESCRICAO, DESCRIÇÃO, INCONSISTENCIA, etc.
+    """
+    raw = str(valor or "").strip()
 
+    if not raw:
+        return False
+
+    raw_norm = unicodedata.normalize("NFKD", raw)
+    raw_norm = "".join(c for c in raw_norm if not unicodedata.combining(c))
+    raw_norm = re.sub(r"\s+", " ", raw_norm).upper().strip()
+
+    invalidos = {
+        "",
+        "NAN",
+        "NONE",
+        "DESCRICAO",
+        "DESCRIÇÃO",
+        "DESCRICAO INCONSISTENCIA",
+        "DESCRIÇÃO INCONSISTÊNCIA",
+        "INCONSISTENCIA",
+        "INCONSISTÊNCIA",
+    }
+
+    if raw_norm in invalidos:
+        return False
+
+    desc_norm = normalizar_inconsistencia(raw)
+
+    if desc_norm in {
+        "DESCRICAO",
+        "DESCRIÇÃO",
+        "DESCRICAO INCONSISTENCIA",
+        "DESCRIÇÃO INCONSISTÊNCIA",
+        "INCONSISTENCIA",
+        "INCONSISTÊNCIA",
+    }:
+        return False
+
+    return True
+    
 def _df_historico_full(df_hist: pd.DataFrame):
     """
     Retorna linhas de inconsistências por serviço,
@@ -2004,6 +2046,12 @@ def _df_historico_full(df_hist: pd.DataFrame):
     )
 
     if not col_servico or not col_inc:
+        return pd.DataFrame()
+
+    # Remove linhas de cabeçalho capturadas indevidamente como inconsistência.
+    dfh = dfh[dfh[col_inc].apply(_descricao_historico_valida)].copy()
+
+    if dfh.empty:
         return pd.DataFrame()
 
     return dfh
