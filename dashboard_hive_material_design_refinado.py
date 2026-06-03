@@ -1927,7 +1927,7 @@ def render_controle_robos(
     for servico, status_desejado in servicos_desejados.items():
         status_anterior = status_ecrv_base.get(servico, status_painel.get(servico, "ON"))
         status_anterior = normalizar_status_on_off(status_anterior, padrao="ON")
-
+    
         if status_anterior != status_desejado:
             acoes.append({
                 "servico": servico,
@@ -1935,7 +1935,27 @@ def render_controle_robos(
                 "status_anterior": status_anterior,
                 "status_desejado": status_desejado,
             })
-
+    
+    if not acoes:
+        st.success(
+            "Controle do Dashboard aplicado. Nenhum comando foi enviado ao RPA, "
+            "pois não houve alteração no bloco e-CRV."
+        )
+    
+        st.markdown(
+            """
+    <div class="controle-alerta">
+        <b>Resultado:</b> alteração aplicada somente no Dashboard.<br>
+        <span class="controle-mini-note">
+            O bloco e-CRV não foi alterado, portanto nenhum comando PENDENTE foi gravado no GitHub.
+        </span>
+    </div>
+    """,
+            unsafe_allow_html=True,
+        )
+    
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
     payload = {
         "id": agora.strftime("%Y%m%d_%H%M%S"),
         "origem": "dashboard",
