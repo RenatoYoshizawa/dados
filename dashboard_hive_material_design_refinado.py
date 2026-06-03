@@ -3922,7 +3922,7 @@ if pagina == "Monitoramento atual":
 elif pagina == "Logs":
     st.markdown(
         '''
-<div class="hive-title">Logs do monitoramento</div>
+<div class="hive-title">Logs do Monitoramento e-CRV</div>
 <div class="hive-subtitle">
     Acompanhe os registros operacionais do monitoramento e-CRV na data selecionada.
 </div>
