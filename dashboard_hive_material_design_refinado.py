@@ -844,33 +844,30 @@ button[kind="header"] {
    BOTÕES DESLIZANTES - CONTROLE DE ROBÔS
 ========================= */
 
-/* Garante que a linha/texto do toggle não receba cor */
-div[data-testid="stToggle"] label[data-baseweb="checkbox"] {
-    background: transparent !important;
-}
-
-/* Remove qualquer cor aplicada ao texto/área externa */
+/* Não pinta a linha nem o texto */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"],
 div[data-testid="stToggle"] label[data-baseweb="checkbox"] > div {
     background: transparent !important;
 }
 
-/* OFF - somente o botão deslizante fica vermelho */
+/* OFF - botão deslizante vermelho */
 div[data-testid="stToggle"] label[data-baseweb="checkbox"] > span:first-child > div {
     background-color: var(--md-red) !important;
     border-color: var(--md-red) !important;
 }
 
-/* ON - somente o botão deslizante fica verde */
-div[data-testid="stToggle"] label[data-baseweb="checkbox"]:has(input:checked) > span:first-child > div {
+/* ON - botão deslizante verde */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"]:has(input:checked) > span:first-child > div,
+div[data-testid="stToggle"] label[data-baseweb="checkbox"]:has([aria-checked="true"]) > span:first-child > div,
+div[data-testid="stToggle"]:has([aria-checked="true"]) label[data-baseweb="checkbox"] > span:first-child > div {
     background-color: var(--md-green) !important;
     border-color: var(--md-green) !important;
 }
 
-/* Bolinha interna do botão */
+/* Bolinha interna */
 div[data-testid="stToggle"] label[data-baseweb="checkbox"] > span:first-child > div > div {
     background-color: #FFFFFF !important;
 }
-
 /* =========================
    ALERTA VISUAL - CRÍTICAS / ROBÔS OFF
 ========================= */
