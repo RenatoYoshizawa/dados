@@ -91,6 +91,18 @@ ARQ_LOCAL_LOG_DIA = CACHE_DIR / "Log_Dia.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
+
+def caminho_github_log_data(data_ref=None) -> str:
+    """Monta o caminho do CSV de log diário no GitHub para a data informada."""
+    ref = pd.Timestamp(data_ref if data_ref is not None else agora_sao_paulo())
+    return f"logs/Log_{ref.strftime('%Y_%m_%d')}.csv"
+
+
+def caminho_local_log_data(data_ref=None) -> Path:
+    """Monta o caminho local de cache do CSV de log diário para a data informada."""
+    ref = pd.Timestamp(data_ref if data_ref is not None else agora_sao_paulo())
+    return CACHE_DIR / f"Log_{ref.strftime('%Y_%m_%d')}.csv"
+
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
 JANELA_STOP_MINUTOS = 420  # considera STOPs dos últimos 420 minutos
@@ -1179,7 +1191,7 @@ def classe_nivel_log(nivel: str) -> str:
     return f"log-level-{nivel_norm}"
 
 
-def carregar_log_diario_dashboard() -> tuple[pd.DataFrame, dict]:
+def carregar_log_diario_dashboard(data_log=None) -> tuple[pd.DataFrame, dict]:
     """
     Carrega o CSV diário de logs gerado pelo robô.
 
@@ -1187,16 +1199,21 @@ def carregar_log_diario_dashboard() -> tuple[pd.DataFrame, dict]:
       logs/Log_YYYY_MM_DD.csv
     """
     meta_log = {}
+    caminho_repo = caminho_github_log_data(data_log)
+    arquivo_local = caminho_local_log_data(data_log)
 
     try:
         caminho_log, meta_log = baixar_github_se_houver_alteracao(
-            GITHUB_ARQ_LOG_DIA,
-            ARQ_LOCAL_LOG_DIA,
+            caminho_repo,
+            arquivo_local,
             obrigatorio=False,
         )
 
+        meta_log = meta_log or {}
+        meta_log["path"] = caminho_repo
+
         if not caminho_log or not Path(caminho_log).exists():
-            return pd.DataFrame(), meta_log or {}
+            return pd.DataFrame(), meta_log
 
         df_log = pd.read_csv(
             caminho_log,
@@ -1207,7 +1224,7 @@ def carregar_log_diario_dashboard() -> tuple[pd.DataFrame, dict]:
         df_log = normalizar_colunas(df_log)
 
         if df_log.empty:
-            return pd.DataFrame(), meta_log or {}
+            return pd.DataFrame(), meta_log
 
         for col in ["Data/Hora", "Horário", "Nível", "Mensagem"]:
             if col not in df_log.columns:
@@ -1232,10 +1249,10 @@ def carregar_log_diario_dashboard() -> tuple[pd.DataFrame, dict]:
             .reset_index(drop=True)
         )
 
-        return df_log, meta_log or {}
+        return df_log, meta_log
 
     except Exception:
-        return pd.DataFrame(), meta_log or {}
+        return pd.DataFrame(), meta_log or {"path": caminho_repo}
 
 
 def render_logs_dashboard(df_log: pd.DataFrame, meta_log: dict | None = None):
@@ -1243,44 +1260,38 @@ def render_logs_dashboard(df_log: pd.DataFrame, meta_log: dict | None = None):
 
     total_logs = 0 if df_log is None or df_log.empty else len(df_log)
     ultima_atualizacao = meta_log.get("downloaded_at", "") or "Não sincronizado"
-    arquivo_log = GITHUB_ARQ_LOG_DIA
+    arquivo_log = meta_log.get("path") or GITHUB_ARQ_LOG_DIA
 
     if df_log is None or df_log.empty:
         ultimo_log = "-"
     else:
         ultimo_log = str(df_log.iloc[0].get("Data/Hora", "-"))
 
-    st.markdown(
-        f"""
-        <div class="log-toolbar">
-            <div class="log-meta-card">
-                <div class="log-meta-label">Arquivo</div>
-                <div class="log-meta-value">{html.escape(str(arquivo_log))}</div>
-            </div>
-            <div class="log-meta-card">
-                <div class="log-meta-label">Linhas carregadas</div>
-                <div class="log-meta-value">{html.escape(fmt_num(total_logs))}</div>
-            </div>
-            <div class="log-meta-card">
-                <div class="log-meta-label">Último log</div>
-                <div class="log-meta-value">{html.escape(str(ultimo_log))}</div>
-            </div>
-            <div class="log-meta-card">
-                <div class="log-meta-label">Sincronizado em</div>
-                <div class="log-meta-value">{html.escape(str(ultima_atualizacao))}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    html_meta = (
+        '<div class="log-toolbar">'
+        '<div class="log-meta-card">'
+        '<div class="log-meta-label">Arquivo</div>'
+        f'<div class="log-meta-value">{html.escape(str(arquivo_log))}</div>'
+        '</div>'
+        '<div class="log-meta-card">'
+        '<div class="log-meta-label">Linhas carregadas</div>'
+        f'<div class="log-meta-value">{html.escape(fmt_num(total_logs))}</div>'
+        '</div>'
+        '<div class="log-meta-card">'
+        '<div class="log-meta-label">Último log</div>'
+        f'<div class="log-meta-value">{html.escape(str(ultimo_log))}</div>'
+        '</div>'
+        '<div class="log-meta-card">'
+        '<div class="log-meta-label">Sincronizado em</div>'
+        f'<div class="log-meta-value">{html.escape(str(ultima_atualizacao))}</div>'
+        '</div>'
+        '</div>'
     )
+    st.markdown(html_meta, unsafe_allow_html=True)
 
     if df_log is None or df_log.empty:
         st.markdown(
-            """
-            <div class="log-empty">
-                Nenhum log encontrado para o dia atual.
-            </div>
-            """,
+            '<div class="log-empty">Nenhum log encontrado para a data selecionada.</div>',
             unsafe_allow_html=True,
         )
         return
@@ -1319,11 +1330,7 @@ def render_logs_dashboard(df_log: pd.DataFrame, meta_log: dict | None = None):
 
     if df_view.empty:
         st.markdown(
-            """
-            <div class="log-empty">
-                Nenhum log encontrado com os filtros selecionados.
-            </div>
-            """,
+            '<div class="log-empty">Nenhum log encontrado com os filtros selecionados.</div>',
             unsafe_allow_html=True,
         )
         return
@@ -1338,21 +1345,15 @@ def render_logs_dashboard(df_log: pd.DataFrame, meta_log: dict | None = None):
         classe = classe_nivel_log(nivel)
 
         linhas_html.append(
-            f"""
-            <div class="log-row">
-                <div class="log-time">{html.escape(data_hora)}</div>
-                <div><span class="log-level {html.escape(classe)}">{html.escape(nivel)}</span></div>
-                <div class="log-msg">{html.escape(msg)}</div>
-            </div>
-            """
+            '<div class="log-row">'
+            f'<div class="log-time">{html.escape(data_hora)}</div>'
+            f'<div><span class="log-level {html.escape(classe)}">{html.escape(nivel)}</span></div>'
+            f'<div class="log-msg">{html.escape(msg)}</div>'
+            '</div>'
         )
 
     st.markdown(
-        f"""
-        <div class="log-list">
-            {''.join(linhas_html)}
-        </div>
-        """,
+        '<div class="log-list">' + ''.join(linhas_html) + '</div>',
         unsafe_allow_html=True,
     )
 
@@ -3429,13 +3430,7 @@ except Exception as e:
     st.warning(f"Historico_Criticas.xlsx ainda não disponível ou não carregado: {e}")
 
 
-df_log_dia = pd.DataFrame()
-meta_log_dia = {}
-try:
-    df_log_dia, meta_log_dia = carregar_log_diario_dashboard()
-except Exception:
-    df_log_dia = pd.DataFrame()
-    meta_log_dia = {}
+# Logs são carregados sob demanda na página Logs, conforme a data selecionada.
 
 # Evita horários duplicados após normalização do RPA.
 df = agrupar_monitoramento_por_horario(df)
@@ -3877,14 +3872,38 @@ if pagina == "Monitoramento atual":
 
 elif pagina == "Logs":
     st.markdown(
-        """
-        <div class="hive-title">Logs do robô</div>
-        <div class="hive-subtitle">
-            Acompanhe os registros operacionais do monitoramento e-CRV no dia atual.
-        </div>
-        """,
+        '''
+<div class="hive-title">Logs do robô</div>
+<div class="hive-subtitle">
+    Acompanhe os registros operacionais do monitoramento e-CRV na data selecionada.
+</div>
+''',
         unsafe_allow_html=True,
     )
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-title">Selecionar data do log</div>',
+        unsafe_allow_html=True,
+    )
+
+    data_log_selecionada = st.date_input(
+        "Data do log",
+        value=agora_sao_paulo().date(),
+        key="logs_data_selecionada",
+        format="DD/MM/YYYY",
+    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    df_log_dia = pd.DataFrame()
+    meta_log_dia = {}
+
+    try:
+        df_log_dia, meta_log_dia = carregar_log_diario_dashboard(data_log_selecionada)
+    except Exception:
+        df_log_dia = pd.DataFrame()
+        meta_log_dia = {"path": caminho_github_log_data(data_log_selecionada)}
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown(
