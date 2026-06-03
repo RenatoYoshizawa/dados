@@ -841,6 +841,31 @@ button[kind="header"] {
 }
 
 /* =========================
+   BOTÕES DESLIZANTES - CONTROLE DE ROBÔS
+========================= */
+
+/* Estado ON - verde */
+div[data-testid="stToggle"] [role="switch"][aria-checked="true"] {
+    background-color: var(--md-green) !important;
+}
+
+/* Estado OFF - vermelho */
+div[data-testid="stToggle"] [role="switch"][aria-checked="false"] {
+    background-color: var(--md-red) !important;
+}
+
+/* Compatibilidade caso o Streamlit use checkbox como fallback */
+div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="true"] {
+    background-color: var(--md-green) !important;
+    border-color: var(--md-green) !important;
+}
+
+div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="false"] {
+    background-color: var(--md-red) !important;
+    border-color: var(--md-red) !important;
+}
+
+/* =========================
    ALERTA VISUAL - CRÍTICAS / ROBÔS OFF
 ========================= */
 
