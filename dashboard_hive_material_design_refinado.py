@@ -1013,7 +1013,56 @@ def github_headers():
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
+@st.cache_data(ttl=60)
+def listar_datas_logs_disponiveis():
+    """
+    Lista no GitHub os arquivos existentes em /logs
+    e retorna somente as datas que possuem Log_YYYY_MM_DD.csv.
+    """
+    api_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/contents/logs"
+    )
 
+    try:
+        resp = requests.get(
+            api_url,
+            headers=github_headers(),
+            params={"ref": GITHUB_BRANCH},
+            timeout=30,
+        )
+
+        if resp.status_code == 404:
+            return []
+
+        resp.raise_for_status()
+
+        dados = resp.json()
+
+        if not isinstance(dados, list):
+            return []
+
+        datas = []
+
+        for item in dados:
+            nome = str(item.get("name", "") or "")
+
+            m = re.fullmatch(r"Log_(\d{4})_(\d{2})_(\d{2})\.csv", nome)
+
+            if not m:
+                continue
+
+            ano, mes, dia = map(int, m.groups())
+
+            try:
+                datas.append(datetime(ano, mes, dia).date())
+            except Exception:
+                continue
+
+        return sorted(set(datas), reverse=True)
+
+    except Exception:
+        return []
 
 def carregar_meta_cache() -> dict:
     try:
@@ -3887,11 +3936,29 @@ elif pagina == "Logs":
         unsafe_allow_html=True,
     )
 
-    data_log_selecionada = st.date_input(
+    datas_logs_disponiveis = listar_datas_logs_disponiveis()
+    
+    if not datas_logs_disponiveis:
+        st.markdown(
+            '<div class="log-empty">Nenhum arquivo de log encontrado no GitHub.</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.stop()
+    
+    hoje = agora_sao_paulo().date()
+    
+    try:
+        indice_padrao_log = datas_logs_disponiveis.index(hoje)
+    except ValueError:
+        indice_padrao_log = 0
+    
+    data_log_selecionada = st.selectbox(
         "Data do log",
-        value=agora_sao_paulo().date(),
+        options=datas_logs_disponiveis,
+        index=indice_padrao_log,
+        format_func=lambda d: d.strftime("%d/%m/%Y"),
         key="logs_data_selecionada",
-        format="DD/MM/YYYY",
     )
 
     st.markdown("</div>", unsafe_allow_html=True)
