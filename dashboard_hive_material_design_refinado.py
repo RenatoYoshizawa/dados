@@ -1956,7 +1956,12 @@ def render_controle_robos(
         )
     
         st.markdown("</div>", unsafe_allow_html=True)
+    
+        st.query_params["pagina"] = "Monitoramento atual"
+        st.query_params["tema"] = tema
+        rerun_streamlit()
         return
+    
     payload = {
         "id": agora.strftime("%Y%m%d_%H%M%S"),
         "origem": "dashboard",
