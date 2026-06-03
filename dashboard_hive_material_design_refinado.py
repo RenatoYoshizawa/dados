@@ -1916,6 +1916,7 @@ def render_controle_robos(
     st.session_state["controle_dash_ate"] = agora + pd.Timedelta(
         minutes=TEMPO_MINIMO_OFF_MINUTOS
     )
+    st.session_state["controle_robos_reinicializar"] = True
 
     # 2) Comando real/sinal para o RPA via GitHub.
     servicos_desejados = {
