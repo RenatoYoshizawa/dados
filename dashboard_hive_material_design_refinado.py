@@ -844,48 +844,27 @@ button[kind="header"] {
    BOTÕES DESLIZANTES - CONTROLE DE ROBÔS
 ========================= */
 
-/* st.toggle - estado ON */
-div[data-testid="stToggle"] button[role="switch"][aria-checked="true"],
-div[data-testid="stToggle"] [role="switch"][aria-checked="true"] {
-    background-color: var(--md-green) !important;
-    border-color: var(--md-green) !important;
+/* Remove fundo da linha/texto do toggle */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"] {
+    background: transparent !important;
 }
 
-/* st.toggle - estado OFF */
-div[data-testid="stToggle"] button[role="switch"][aria-checked="false"],
-div[data-testid="stToggle"] [role="switch"][aria-checked="false"] {
+/* Botão deslizante OFF - vermelho */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"] > div:first-child {
     background-color: var(--md-red) !important;
     border-color: var(--md-red) !important;
 }
 
-/* Elemento visual interno do toggle */
-div[data-testid="stToggle"] [data-baseweb="checkbox"] {
-    background-color: var(--md-red) !important;
-}
-
-/* Quando estiver ligado, força verde no componente interno */
-div[data-testid="stToggle"] [aria-checked="true"] [data-baseweb="checkbox"],
-div[data-testid="stToggle"]:has([aria-checked="true"]) [data-baseweb="checkbox"] {
-    background-color: var(--md-green) !important;
-}
-
-/* Quando estiver desligado, força vermelho no componente interno */
-div[data-testid="stToggle"] [aria-checked="false"] [data-baseweb="checkbox"],
-div[data-testid="stToggle"]:has([aria-checked="false"]) [data-baseweb="checkbox"] {
-    background-color: var(--md-red) !important;
-}
-
-/* Fallback se o Streamlit usar st.checkbox */
-div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="true"],
-div[data-testid="stCheckbox"]:has(input:checked) [data-baseweb="checkbox"] {
+/* Botão deslizante ON - verde */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"]:has(input:checked) > div:first-child,
+div[data-testid="stToggle"] label[data-baseweb="checkbox"]:has([aria-checked="true"]) > div:first-child {
     background-color: var(--md-green) !important;
     border-color: var(--md-green) !important;
 }
 
-div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="false"],
-div[data-testid="stCheckbox"]:has(input:not(:checked)) [data-baseweb="checkbox"] {
-    background-color: var(--md-red) !important;
-    border-color: var(--md-red) !important;
+/* Bolinha interna do botão */
+div[data-testid="stToggle"] label[data-baseweb="checkbox"] > div:first-child > div {
+    background-color: #FFFFFF !important;
 }
 /* =========================
    ALERTA VISUAL - CRÍTICAS / ROBÔS OFF
