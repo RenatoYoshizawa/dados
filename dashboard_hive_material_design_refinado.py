@@ -4,6 +4,7 @@ import base64
 import json
 import re
 import unicodedata
+import html
 from datetime import datetime
 from pathlib import Path
 
@@ -54,6 +55,7 @@ WEBHOOK_TEAMS = st.secrets.get(
 GITHUB_ARQ_MONITORAMENTO = "monitoramento/Monitoramento.xlsx"
 GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
+GITHUB_ARQ_LOG_DIA = f"logs/Log_{agora_sao_paulo().strftime('%Y_%m_%d')}.csv"
 
 # Quantidade de meses que serão exibidos na página de Histórico.
 # Exemplo: 6 = mês atual + 5 meses anteriores.
@@ -85,6 +87,7 @@ ARQ_LOCAL_CRITICAS = CACHE_DIR / "Criticas.xlsx"
 ARQ_LOCAL_HISTORICO = CACHE_DIR / "Historico_Criticas.xlsx"
 ARQ_LOCAL_MONITORAMENTO_HIST = CACHE_DIR / "Monitoramento_Historico.csv"
 ARQ_LOCAL_INCONSISTENCIAS_HIST = CACHE_DIR / "Inconsistencias_Historico.csv"
+ARQ_LOCAL_LOG_DIA = CACHE_DIR / "Log_Dia.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 
@@ -489,6 +492,182 @@ button[kind="header"] {
     background: var(--md-surface);
 }
 
+
+
+/* =========================
+   MENU / LOGS DO ROBÔ
+========================= */
+
+.menu-divider {
+    opacity: 0;
+    height: 1px;
+    margin: 10px 18px;
+    background: #E0E3EB;
+    transition: opacity 0.2s ease;
+}
+
+.hover-menu:hover .menu-divider {
+    opacity: 1;
+}
+
+.menu-item-theme {
+    margin-top: 4px;
+    color: #5F6368 !important;
+}
+
+.log-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+    margin-bottom: 16px;
+}
+
+.log-meta-card {
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-border);
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: var(--md-shadow);
+    min-width: 0;
+}
+
+.log-meta-label {
+    color: var(--md-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 5px;
+}
+
+.log-meta-value {
+    color: var(--md-text);
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.log-filter-box {
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-border);
+    border-radius: 18px;
+    padding: 14px 16px 4px 16px;
+    margin: 8px 0 14px 0;
+    box-shadow: var(--md-shadow);
+}
+
+.log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 68vh;
+    overflow-y: auto;
+    padding: 2px 4px 2px 0;
+}
+
+.log-row {
+    display: grid;
+    grid-template-columns: 158px 96px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    background: var(--md-surface);
+    border: 1px solid var(--md-border);
+    border-radius: 18px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 2px rgba(60,64,67,.08);
+}
+
+.log-time {
+    color: var(--md-muted);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    padding-top: 3px;
+}
+
+.log-level {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 76px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+}
+
+.log-msg {
+    color: var(--md-text);
+    font-size: 13px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.log-level-info,
+.log-level-etapa,
+.log-level-step,
+.log-level-sched,
+.log-level-intervalo {
+    background: #E8F0FE;
+    color: #174EA6;
+}
+
+.log-level-ok {
+    background: #E6F4EA;
+    color: #137333;
+}
+
+.log-level-warn {
+    background: #FEF7E0;
+    color: #B06000;
+}
+
+.log-level-fail,
+.log-level-erro,
+.log-level-error {
+    background: #FCE8E6;
+    color: #B3261E;
+}
+
+.log-empty {
+    background: var(--md-surface-container);
+    border: 1px dashed var(--md-border);
+    color: var(--md-muted);
+    border-radius: 18px;
+    padding: 22px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+    .log-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .log-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .log-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .log-time {
+        white-space: normal;
+    }
+
+    .log-level {
+        width: fit-content;
+    }
+}
 </style>
 """
 
@@ -664,6 +843,80 @@ div[data-testid="stDataFrame"] .gdg-header {
     background: #0E315F !important;
     color: #EAF4FF !important;
 }
+
+
+/* =========================
+   LOGS DO ROBÔ - TEMA ESCURO
+========================= */
+
+.menu-divider {
+    background: rgba(91, 166, 255, 0.22) !important;
+}
+
+.menu-item-theme {
+    color: #9DB7D2 !important;
+}
+
+.log-meta-card,
+.log-filter-box {
+    background: rgba(10, 35, 68, .96) !important;
+    border: 1px solid rgba(91, 166, 255, 0.22) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .28) !important;
+}
+
+.log-meta-label {
+    color: #9DB7D2 !important;
+}
+
+.log-meta-value {
+    color: #EAF4FF !important;
+}
+
+.log-row {
+    background: rgba(7, 25, 49, .96) !important;
+    border: 1px solid rgba(91, 166, 255, 0.18) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .24) !important;
+}
+
+.log-time {
+    color: #9DB7D2 !important;
+}
+
+.log-msg {
+    color: #EAF4FF !important;
+}
+
+.log-level-info,
+.log-level-etapa,
+.log-level-step,
+.log-level-sched,
+.log-level-intervalo {
+    background: rgba(51, 199, 255, 0.14) !important;
+    color: #33C7FF !important;
+}
+
+.log-level-ok {
+    background: rgba(33, 208, 122, 0.14) !important;
+    color: #21D07A !important;
+}
+
+.log-level-warn {
+    background: rgba(246, 195, 67, 0.16) !important;
+    color: #F6C343 !important;
+}
+
+.log-level-fail,
+.log-level-erro,
+.log-level-error {
+    background: rgba(255, 77, 94, 0.16) !important;
+    color: #FF4D5E !important;
+}
+
+.log-empty {
+    background: rgba(10, 35, 68, .80) !important;
+    border: 1px dashed rgba(91, 166, 255, 0.25) !important;
+    color: #9DB7D2 !important;
+}
 </style>
 """
 
@@ -707,6 +960,13 @@ menu_html = f"""
     </a>
 
     <a class="menu-item"
+       href="?pagina=Logs&tema={tema}">
+       🧾 Logs
+    </a>
+
+    <div class="menu-divider"></div>
+
+    <a class="menu-item menu-item-theme"
        href="?pagina={pagina}&tema={proximo_tema}">
        {rotulo_tema}
     </a>
@@ -904,6 +1164,198 @@ def carregar_historico_multimes(prefixo: str, obrigatorio: bool = False) -> pd.D
     df_final = normalizar_coluna_data_para_date(df_final)
 
     return df_final
+
+
+def classe_nivel_log(nivel: str) -> str:
+    nivel_norm = str(nivel or "INFO").strip().lower()
+
+    nivel_norm = unicodedata.normalize("NFKD", nivel_norm)
+    nivel_norm = "".join(c for c in nivel_norm if not unicodedata.combining(c))
+    nivel_norm = re.sub(r"[^a-z0-9]+", "-", nivel_norm).strip("-")
+
+    if not nivel_norm:
+        nivel_norm = "info"
+
+    return f"log-level-{nivel_norm}"
+
+
+def carregar_log_diario_dashboard() -> tuple[pd.DataFrame, dict]:
+    """
+    Carrega o CSV diário de logs gerado pelo robô.
+
+    Arquivo esperado no GitHub:
+      logs/Log_YYYY_MM_DD.csv
+    """
+    meta_log = {}
+
+    try:
+        caminho_log, meta_log = baixar_github_se_houver_alteracao(
+            GITHUB_ARQ_LOG_DIA,
+            ARQ_LOCAL_LOG_DIA,
+            obrigatorio=False,
+        )
+
+        if not caminho_log or not Path(caminho_log).exists():
+            return pd.DataFrame(), meta_log or {}
+
+        df_log = pd.read_csv(
+            caminho_log,
+            sep=";",
+            encoding="utf-8-sig",
+        )
+
+        df_log = normalizar_colunas(df_log)
+
+        if df_log.empty:
+            return pd.DataFrame(), meta_log or {}
+
+        for col in ["Data/Hora", "Horário", "Nível", "Mensagem"]:
+            if col not in df_log.columns:
+                df_log[col] = ""
+
+        df_log["Data/Hora"] = df_log["Data/Hora"].astype(str).str.strip()
+        df_log["Horário"] = df_log["Horário"].astype(str).str.strip()
+        df_log["Nível"] = df_log["Nível"].astype(str).str.strip().replace("", "INFO")
+        df_log["Mensagem"] = df_log["Mensagem"].astype(str).str.strip()
+
+        df_log["_ordem"] = pd.to_datetime(
+            df_log["Data/Hora"],
+            dayfirst=True,
+            errors="coerce",
+            format="mixed",
+        )
+
+        df_log = (
+            df_log
+            .sort_values("_ordem", ascending=False)
+            .drop(columns=["_ordem"], errors="ignore")
+            .reset_index(drop=True)
+        )
+
+        return df_log, meta_log or {}
+
+    except Exception:
+        return pd.DataFrame(), meta_log or {}
+
+
+def render_logs_dashboard(df_log: pd.DataFrame, meta_log: dict | None = None):
+    meta_log = meta_log or {}
+
+    total_logs = 0 if df_log is None or df_log.empty else len(df_log)
+    ultima_atualizacao = meta_log.get("downloaded_at", "") or "Não sincronizado"
+    arquivo_log = GITHUB_ARQ_LOG_DIA
+
+    if df_log is None or df_log.empty:
+        ultimo_log = "-"
+    else:
+        ultimo_log = str(df_log.iloc[0].get("Data/Hora", "-"))
+
+    st.markdown(
+        f"""
+        <div class="log-toolbar">
+            <div class="log-meta-card">
+                <div class="log-meta-label">Arquivo</div>
+                <div class="log-meta-value">{html.escape(str(arquivo_log))}</div>
+            </div>
+            <div class="log-meta-card">
+                <div class="log-meta-label">Linhas carregadas</div>
+                <div class="log-meta-value">{html.escape(fmt_num(total_logs))}</div>
+            </div>
+            <div class="log-meta-card">
+                <div class="log-meta-label">Último log</div>
+                <div class="log-meta-value">{html.escape(str(ultimo_log))}</div>
+            </div>
+            <div class="log-meta-card">
+                <div class="log-meta-label">Sincronizado em</div>
+                <div class="log-meta-value">{html.escape(str(ultima_atualizacao))}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if df_log is None or df_log.empty:
+        st.markdown(
+            """
+            <div class="log-empty">
+                Nenhum log encontrado para o dia atual.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    niveis_disponiveis = sorted(
+        [n for n in df_log["Nível"].dropna().astype(str).unique() if n.strip()]
+    )
+
+    st.markdown('<div class="log-filter-box">', unsafe_allow_html=True)
+    col_filtro_1, col_filtro_2 = st.columns([2, 1])
+
+    with col_filtro_1:
+        niveis_selecionados = st.multiselect(
+            "Filtrar por nível",
+            options=niveis_disponiveis,
+            default=[],
+            key="logs_filtro_nivel",
+        )
+
+    with col_filtro_2:
+        limite_linhas = st.selectbox(
+            "Quantidade",
+            options=[50, 100, 200, 500],
+            index=1,
+            key="logs_limite_linhas",
+        )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    df_view = df_log.copy()
+
+    if niveis_selecionados:
+        df_view = df_view[df_view["Nível"].isin(niveis_selecionados)].copy()
+
+    df_view = df_view.head(int(limite_linhas)).copy()
+
+    if df_view.empty:
+        st.markdown(
+            """
+            <div class="log-empty">
+                Nenhum log encontrado com os filtros selecionados.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    linhas_html = []
+
+    for _, row in df_view.iterrows():
+        data_hora = str(row.get("Data/Hora", "") or "").strip()
+        nivel = str(row.get("Nível", "INFO") or "INFO").strip()
+        msg = str(row.get("Mensagem", "") or "").strip()
+
+        classe = classe_nivel_log(nivel)
+
+        linhas_html.append(
+            f"""
+            <div class="log-row">
+                <div class="log-time">{html.escape(data_hora)}</div>
+                <div><span class="log-level {html.escape(classe)}">{html.escape(nivel)}</span></div>
+                <div class="log-msg">{html.escape(msg)}</div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <div class="log-list">
+            {''.join(linhas_html)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # =========================
 # FUNÇÕES AUXILIARES
 # =========================
@@ -2792,39 +3244,6 @@ def _preparar_historico_full_total(df_hist: pd.DataFrame) -> pd.DataFrame:
     
     out["Descrição"] = out["Descrição agrupada"]
 
-    with st.expander(
-        "DEBUG - Conferência inconsistências Transferências",
-        expanded=False
-    ):
-    
-        st.write("Totais por serviço:")
-    
-        st.dataframe(
-            out.groupby(
-                "_chave_servico",
-                as_index=False
-            )["Total ciclo atual"].sum()
-        )
-    
-        st.write("Linhas classificadas como Transferência:")
-    
-        st.dataframe(
-            out[
-                out["_chave_servico"]
-                .astype(str)
-                .str.contains(
-                    "Transfer",
-                    na=False
-                )
-            ][[
-                "Serviço",
-                "Descrição",
-                "Descrição agrupada",
-                "Total ciclo atual",
-                "Diferença"
-            ]]
-        )
-    
     return out
 
 def tabela_historico_servico(df_hist: pd.DataFrame, chave_servico: str) -> pd.DataFrame:
@@ -3008,6 +3427,15 @@ try:
         df_hist = carregar_excel_generico(str(caminho_hist), Path(caminho_hist).stat().st_mtime)
 except Exception as e:
     st.warning(f"Historico_Criticas.xlsx ainda não disponível ou não carregado: {e}")
+
+
+df_log_dia = pd.DataFrame()
+meta_log_dia = {}
+try:
+    df_log_dia, meta_log_dia = carregar_log_diario_dashboard()
+except Exception:
+    df_log_dia = pd.DataFrame()
+    meta_log_dia = {}
 
 # Evita horários duplicados após normalização do RPA.
 df = agrupar_monitoramento_por_horario(df)
@@ -3444,6 +3872,29 @@ if pagina == "Monitoramento atual":
 
 
 
+
+
+
+elif pagina == "Logs":
+    st.markdown(
+        """
+        <div class="hive-title">Logs do robô</div>
+        <div class="hive-subtitle">
+            Acompanhe os registros operacionais do monitoramento e-CRV no dia atual.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-title">Log diário do robô</div>',
+        unsafe_allow_html=True,
+    )
+
+    render_logs_dashboard(df_log_dia, meta_log_dia)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 elif pagina == "Histórico monitoramento":
