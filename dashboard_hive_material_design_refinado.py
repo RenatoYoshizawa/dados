@@ -57,6 +57,12 @@ GITHUB_ARQ_CRITICAS = "monitoramento/Criticas.xlsx"
 GITHUB_ARQ_HISTORICO = "monitoramento/Historico_Criticas.xlsx"
 GITHUB_ARQ_LOG_DIA = f"logs/Log_{agora_sao_paulo().strftime('%Y_%m_%d')}.csv"
 
+# Arquivos usados pelo controle manual de robôs.
+# controle_ecrv.json: comando PENDENTE gravado pelo dashboard para o RPA processar.
+# status_ecrv.json: retorno/estado confirmado pelo RPA para o dashboard reconhecer.
+GITHUB_ARQ_CONTROLE_ECRV = "comandos/controle_ecrv.json"
+GITHUB_ARQ_STATUS_ECRV = "status/status_ecrv.json"
+
 # Quantidade de meses que serão exibidos na página de Histórico.
 # Exemplo: 6 = mês atual + 5 meses anteriores.
 QUANTIDADE_MESES_HISTORICO = 6
@@ -90,6 +96,8 @@ ARQ_LOCAL_INCONSISTENCIAS_HIST = CACHE_DIR / "Inconsistencias_Historico.csv"
 ARQ_LOCAL_LOG_DIA = CACHE_DIR / "Log_Dia.csv"
 META_LOCAL = CACHE_DIR / "github_meta.json"
 ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
+ARQ_LOCAL_CONTROLE_ECRV = CACHE_DIR / "controle_ecrv.json"
+ARQ_LOCAL_STATUS_ECRV = CACHE_DIR / "status_ecrv.json"
 
 
 def caminho_github_log_data(data_ref=None) -> str:
@@ -106,6 +114,7 @@ def caminho_local_log_data(data_ref=None) -> Path:
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
 JANELA_STOP_MINUTOS = 420  # considera STOPs dos últimos 420 minutos
+JANELA_STATUS_RPA_MINUTOS = 60  # usa confirmação do RPA somente se for recente
 
 
 # =========================
@@ -681,6 +690,156 @@ button[kind="header"] {
     }
 }
 
+
+
+/* =========================
+   CONTROLE MANUAL DE ROBÔS
+========================= */
+
+.controle-page-wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+}
+
+.controle-hero {
+    background: var(--md-surface);
+    border: 1px solid var(--md-border);
+    border-radius: 28px;
+    padding: 24px 28px;
+    margin: 8px auto 18px auto;
+    box-shadow: var(--md-shadow);
+    text-align: center;
+}
+
+.controle-hero-icon {
+    width: 52px;
+    height: 52px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: var(--md-blue-soft);
+    color: var(--md-primary);
+    font-size: 25px;
+    margin-bottom: 10px;
+}
+
+.controle-hero-title {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--md-text);
+    margin-bottom: 4px;
+}
+
+.controle-hero-subtitle {
+    color: var(--md-muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.controle-login-card {
+    max-width: 520px;
+    margin: 24px auto;
+    background: var(--md-surface);
+    border: 1px solid var(--md-border);
+    border-radius: 28px;
+    padding: 24px 26px;
+    box-shadow: var(--md-shadow);
+}
+
+.controle-login-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--md-text);
+    margin-bottom: 4px;
+    text-align: center;
+}
+
+.controle-login-subtitle {
+    color: var(--md-muted);
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.controle-alerta {
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-border);
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin: 10px 0 14px 0;
+    color: var(--md-text);
+    box-shadow: var(--md-shadow);
+}
+
+.controle-grid-status {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+
+.controle-status-card {
+    background: var(--md-surface-container);
+    border: 1px solid var(--md-border);
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: var(--md-shadow);
+}
+
+.controle-status-card-title {
+    color: var(--md-muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 6px;
+}
+
+.controle-status-card-value {
+    color: var(--md-text);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.controle-mini-note {
+    color: var(--md-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    margin-top: 8px;
+}
+
+.controle-form-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-border);
+    border-radius: 24px;
+    padding: 20px 22px;
+    box-shadow: var(--md-shadow);
+    margin-bottom: 18px;
+}
+
+.controle-section-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--md-text);
+    margin-bottom: 2px;
+}
+
+.controle-section-desc {
+    color: var(--md-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+    .controle-grid-status {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* =========================
    ALERTA VISUAL - CRÍTICAS / ROBÔS OFF
 ========================= */
@@ -966,6 +1125,33 @@ div[data-testid="stDataFrame"] .gdg-header {
     border: 1px dashed rgba(91, 166, 255, 0.25) !important;
     color: #9DB7D2 !important;
 }
+
+
+.controle-hero,
+.controle-login-card,
+.controle-form-card,
+.controle-alerta,
+.controle-status-card {
+    background: rgba(10, 35, 68, .96) !important;
+    border: 1px solid rgba(91, 166, 255, 0.22) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .28) !important;
+}
+
+.controle-hero-title,
+.controle-login-title,
+.controle-section-title,
+.controle-status-card-value,
+.controle-alerta {
+    color: #EAF4FF !important;
+}
+
+.controle-hero-subtitle,
+.controle-login-subtitle,
+.controle-status-card-title,
+.controle-mini-note,
+.controle-section-desc {
+    color: #9DB7D2 !important;
+}
 </style>
 """
 
@@ -1014,6 +1200,11 @@ menu_html = f"""
     </a>
 
     <div class="menu-divider"></div>
+
+    <a class="menu-item"
+       href="?pagina=Ligar/Desligar&tema={tema}">
+       🔐 Ligar/Desligar
+    </a>
 
     <a class="menu-item menu-item-theme"
        href="?pagina={pagina}&tema={proximo_tema}">
@@ -1136,6 +1327,630 @@ def salvar_alerta_ecrv(dados):
         )
     except Exception:
         pass
+
+def normalizar_status_on_off(valor, padrao="ON") -> str:
+    """Normaliza qualquer valor recebido para ON/OFF."""
+    txt = str(valor if valor is not None else "").strip().upper()
+
+    if txt in ("ON", "LIGADO", "TRUE", "1", "SIM"):
+        return "ON"
+
+    if txt in ("OFF", "DESLIGADO", "FALSE", "0", "NAO", "NÃO"):
+        return "OFF"
+
+    return padrao
+
+
+def parse_data_hora_painel(valor):
+    """Converte datas usadas pelo dashboard/RPA em Timestamp, quando possível."""
+    if valor is None or str(valor).strip() == "":
+        return None
+
+    try:
+        dt = pd.to_datetime(
+            valor,
+            dayfirst=True,
+            errors="coerce",
+            format="mixed",
+        )
+    except Exception:
+        return None
+
+    if pd.isna(dt):
+        return None
+
+    try:
+        return pd.Timestamp(dt).tz_localize(None)
+    except Exception:
+        return pd.Timestamp(dt)
+
+
+def rerun_streamlit():
+    """Compatibilidade entre versões do Streamlit."""
+    try:
+        st.rerun()
+    except Exception:
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
+
+
+def carregar_json_github(caminho_repo: str, destino_local: Path, obrigatorio: bool = False) -> tuple[dict, dict]:
+    """Carrega um JSON do GitHub usando o mesmo mecanismo de cache do painel."""
+    try:
+        caminho_local, meta = baixar_github_se_houver_alteracao(
+            caminho_repo,
+            destino_local,
+            obrigatorio=obrigatorio,
+        )
+
+        if not caminho_local or not Path(caminho_local).exists():
+            return {}, meta or {"status": "ausente", "path": caminho_repo}
+
+        conteudo = Path(caminho_local).read_text(encoding="utf-8").strip()
+
+        if not conteudo:
+            return {}, meta or {"path": caminho_repo}
+
+        return json.loads(conteudo), meta or {"path": caminho_repo}
+
+    except FileNotFoundError:
+        if obrigatorio:
+            raise
+        return {}, {"status": "ausente", "path": caminho_repo}
+
+    except Exception as e:
+        return {}, {"status": "erro", "path": caminho_repo, "erro": str(e)}
+
+
+def salvar_json_github(caminho_repo: str, payload: dict, mensagem_commit: str) -> tuple[bool, str]:
+    """
+    Cria/atualiza um JSON no GitHub.
+
+    Necessita TOKEN_GITHUB com permissão de escrita no repositório.
+    """
+    token = obter_token_github()
+
+    if not token:
+        return False, "TOKEN_GITHUB não configurado. Não foi possível gravar o comando no GitHub."
+
+    api_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/contents/{caminho_repo}"
+    )
+
+    headers = github_headers()
+
+    try:
+        resp_get = requests.get(
+            api_url,
+            headers=headers,
+            params={"ref": GITHUB_BRANCH},
+            timeout=30,
+        )
+
+        sha_atual = None
+
+        if resp_get.status_code == 200:
+            sha_atual = resp_get.json().get("sha")
+        elif resp_get.status_code != 404:
+            return False, f"Erro ao consultar arquivo no GitHub: HTTP {resp_get.status_code} - {resp_get.text[:300]}"
+
+        conteudo_json = json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+        body = {
+            "message": mensagem_commit,
+            "content": base64.b64encode(conteudo_json.encode("utf-8")).decode("ascii"),
+            "branch": GITHUB_BRANCH,
+        }
+
+        if sha_atual:
+            body["sha"] = sha_atual
+
+        resp_put = requests.put(
+            api_url,
+            headers=headers,
+            json=body,
+            timeout=30,
+        )
+
+        if resp_put.status_code not in (200, 201):
+            return False, f"Erro ao gravar arquivo no GitHub: HTTP {resp_put.status_code} - {resp_put.text[:300]}"
+
+        dados_resp = resp_put.json()
+        sha_novo = (
+            dados_resp.get("content", {}) or {}
+        ).get("sha", "")
+
+        # Atualiza cache local/metadados para evitar leitura defasada.
+        destino = (
+            ARQ_LOCAL_CONTROLE_ECRV
+            if caminho_repo == GITHUB_ARQ_CONTROLE_ECRV
+            else CACHE_DIR / caminho_repo.replace("/", "_")
+        )
+
+        try:
+            destino.write_text(conteudo_json, encoding="utf-8")
+
+            meta = carregar_meta_cache()
+            meta[caminho_repo] = {
+                "sha": sha_novo,
+                "downloaded_at": agora_sao_paulo().strftime("%d/%m/%Y %H:%M:%S"),
+                "size": len(conteudo_json.encode("utf-8")),
+            }
+            salvar_meta_cache(meta)
+        except Exception:
+            pass
+
+        return True, "Comando gravado no GitHub com sucesso."
+
+    except Exception as e:
+        return False, f"Erro ao gravar comando no GitHub: {e}"
+
+
+def status_card_robos(status_dict, robo_monitoramento_online=True) -> dict:
+    """Retorna o status no mesmo formato exibido no card Robôs."""
+    return {
+        "Transferência 2": normalizar_status_on_off(status_dict.get("Transferência 2", "ON")),
+        "Transferência 3": normalizar_status_on_off(status_dict.get("Transferência 3", "ON")),
+        "0KM": normalizar_status_on_off(status_dict.get("0KM", "ON")),
+        "Monitoramento e-CRV": "ON" if robo_monitoramento_online else "OFF",
+    }
+
+
+def servicos_controle_robos() -> list[str]:
+    return [
+        "Transferência 2",
+        "Transferência 3",
+        "0KM",
+        "Monitoramento e-CRV",
+    ]
+
+
+def aplicar_status_confirmado_rpa(
+    status_dict,
+    robo_monitoramento_online,
+    status_ecrv: dict | None,
+    df_criticas=None,
+    df_hist=None,
+):
+    """
+    Aplica no painel o status confirmado pelo RPA, quando existir.
+
+    Regra de segurança:
+    - se houver STOP posterior à confirmação do RPA, o STOP prevalece;
+    - o status confirmado não impede novo desligamento automático.
+    """
+    if not isinstance(status_ecrv, dict) or not status_ecrv:
+        return status_dict, robo_monitoramento_online
+
+    servicos = status_ecrv.get("servicos")
+
+    if not isinstance(servicos, dict):
+        return status_dict, robo_monitoramento_online
+
+    atualizado_em = (
+        status_ecrv.get("atualizado_em")
+        or status_ecrv.get("processado_em")
+        or status_ecrv.get("data_hora")
+    )
+
+    dt_confirmacao = parse_data_hora_painel(atualizado_em)
+
+    if dt_confirmacao is None:
+        return status_dict, robo_monitoramento_online
+
+    try:
+        if (agora_sao_paulo() - dt_confirmacao).total_seconds() / 60 > JANELA_STATUS_RPA_MINUTOS:
+            return status_dict, robo_monitoramento_online
+    except Exception:
+        return status_dict, robo_monitoramento_online
+
+    status_final = dict(status_dict or {})
+
+    for servico in ["Transferência 2", "Transferência 3", "0KM"]:
+        if servico not in servicos:
+            continue
+
+        desejado = normalizar_status_on_off(servicos.get(servico), padrao=status_final.get(servico, "ON"))
+
+        if desejado == "OFF":
+            status_final[servico] = "OFF"
+            continue
+
+        # Se houver STOP posterior à confirmação, mantém a regra automática.
+        ultimo_stop = _ultimo_stop_servico(df_criticas, df_hist, servico)
+
+        if ultimo_stop is not None and dt_confirmacao is not None and pd.Timestamp(ultimo_stop) > dt_confirmacao:
+            continue
+
+        status_final[servico] = "ON"
+
+    if "Monitoramento e-CRV" in servicos:
+        status_monitor = normalizar_status_on_off(
+            servicos.get("Monitoramento e-CRV"),
+            padrao=("ON" if robo_monitoramento_online else "OFF"),
+        )
+        robo_monitoramento_online = status_monitor == "ON"
+
+    return status_final, robo_monitoramento_online
+
+
+def aplicar_controle_dashboard_manual(
+    status_dict,
+    robo_monitoramento_online,
+    df_criticas=None,
+    df_hist=None,
+):
+    """
+    Aplica controle visual temporário do Dashboard.
+
+    Regras preservadas:
+    - OFF manual força OFF temporariamente no painel;
+    - ON manual não vence STOP novo posterior à intervenção;
+    - após TEMPO_MINIMO_OFF_MINUTOS, volta à regra automática.
+    """
+    controle = st.session_state.get("controle_dash_status")
+    ts_manual = st.session_state.get("controle_dash_ts")
+    ate_manual = st.session_state.get("controle_dash_ate")
+
+    if not isinstance(controle, dict) or not ts_manual or not ate_manual:
+        return status_dict, robo_monitoramento_online
+
+    agora = agora_sao_paulo()
+    ts_manual = parse_data_hora_painel(ts_manual)
+    ate_manual = parse_data_hora_painel(ate_manual)
+
+    if ts_manual is None or ate_manual is None or agora > ate_manual:
+        return status_dict, robo_monitoramento_online
+
+    status_final = dict(status_dict or {})
+
+    for servico in ["Transferência 2", "Transferência 3", "0KM"]:
+        if servico not in controle:
+            continue
+
+        desejado = normalizar_status_on_off(controle.get(servico), padrao=status_final.get(servico, "ON"))
+
+        if desejado == "OFF":
+            status_final[servico] = "OFF"
+            continue
+
+        ultimo_stop = _ultimo_stop_servico(df_criticas, df_hist, servico)
+
+        if ultimo_stop is None or pd.Timestamp(ultimo_stop) <= ts_manual:
+            status_final[servico] = "ON"
+
+    if "Monitoramento e-CRV" in controle:
+        status_monitor = normalizar_status_on_off(
+            controle.get("Monitoramento e-CRV"),
+            padrao=("ON" if robo_monitoramento_online else "OFF"),
+        )
+        robo_monitoramento_online = status_monitor == "ON"
+
+    return status_final, robo_monitoramento_online
+
+
+def status_base_ecrv_para_controle(status_painel: dict, status_ecrv: dict | None = None) -> dict:
+    """
+    Status inicial dos botões e-CRV.
+
+    Usa primeiro a confirmação do RPA em status/status_ecrv.json.
+    Se não houver retorno confirmado, usa o status atual do card Robôs.
+    """
+    base = dict(status_painel or {})
+
+    if isinstance(status_ecrv, dict):
+        atualizado_em = (
+            status_ecrv.get("atualizado_em")
+            or status_ecrv.get("processado_em")
+            or status_ecrv.get("data_hora")
+        )
+        dt_confirmacao = parse_data_hora_painel(atualizado_em)
+
+        status_rpa_recente = False
+        try:
+            status_rpa_recente = (
+                dt_confirmacao is not None
+                and (agora_sao_paulo() - dt_confirmacao).total_seconds() / 60 <= JANELA_STATUS_RPA_MINUTOS
+            )
+        except Exception:
+            status_rpa_recente = False
+
+        servicos = status_ecrv.get("servicos")
+        if status_rpa_recente and isinstance(servicos, dict):
+            for servico in servicos_controle_robos():
+                if servico in servicos:
+                    base[servico] = normalizar_status_on_off(
+                        servicos.get(servico),
+                        padrao=base.get(servico, "ON"),
+                    )
+
+    for servico in servicos_controle_robos():
+        base[servico] = normalizar_status_on_off(base.get(servico), padrao="ON")
+
+    return base
+
+
+def fechar_controle_robos():
+    """Reseta o estado interno do controle de robôs."""
+    st.session_state["controle_robos_aberto"] = False
+    st.session_state["controle_robos_inicializado"] = False
+    st.session_state["controle_robos_reinicializar"] = True
+
+
+def inicializar_chaves_controle_robos(status_painel: dict, status_ecrv_base: dict):
+    """Inicializa os botões ON/OFF com o status atual do painel/e-CRV."""
+    reinicializar = bool(st.session_state.pop("controle_robos_reinicializar", False))
+
+    if st.session_state.get("controle_robos_inicializado") and not reinicializar:
+        return
+
+    for servico in servicos_controle_robos():
+        st.session_state[f"dash_{servico}"] = (
+            normalizar_status_on_off(status_painel.get(servico), padrao="ON") == "ON"
+        )
+        st.session_state[f"ecrv_{servico}"] = (
+            normalizar_status_on_off(status_ecrv_base.get(servico), padrao="ON") == "ON"
+        )
+
+    st.session_state["controle_robos_inicializado"] = True
+
+
+def render_controle_robos(
+    status_painel: dict,
+    status_ecrv: dict | None = None,
+    comando_ecrv: dict | None = None,
+):
+    """Renderiza a página protegida de Ligar/Desligar robôs."""
+    st.markdown(
+        """
+<div class="controle-page-wrap">
+    <div class="controle-hero">
+        <div class="controle-hero-icon">🔐</div>
+        <div class="controle-hero-title">Controle de Robôs</div>
+        <div class="controle-hero-subtitle">
+            Controle visual do Dashboard e envio de comandos para execução pelo RPA de monitoramento.
+        </div>
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    senha_configurada = str(
+        st.secrets.get(
+            "SENHA_CONTROLE_ROBOS",
+            os.getenv("SENHA_CONTROLE_ROBOS", ""),
+        )
+    ).strip()
+
+    if not senha_configurada:
+        st.error("Configure SENHA_CONTROLE_ROBOS nos Secrets do Streamlit para habilitar esta página.")
+        return
+
+    if not st.session_state.get("controle_robos_autorizado"):
+        col_login_1, col_login_2, col_login_3 = st.columns([1, 1.15, 1])
+
+        with col_login_2:
+            st.markdown(
+                """
+<div class="controle-login-card">
+    <div class="controle-login-title">Acesso restrito</div>
+    <div class="controle-login-subtitle">
+        Informe a senha para acessar as opções de ligar/desligar.
+    </div>
+""",
+                unsafe_allow_html=True,
+            )
+
+            with st.form("form_senha_controle_robos"):
+                senha_digitada = st.text_input(
+                    "Senha",
+                    type="password",
+                    key="senha_controle_robos",
+                )
+                entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            if entrar:
+                if senha_digitada == senha_configurada:
+                    st.session_state["controle_robos_autorizado"] = True
+                    st.session_state["controle_robos_reinicializar"] = True
+                    rerun_streamlit()
+                else:
+                    st.error("Senha incorreta.")
+
+        return
+
+    status_painel = {
+        servico: normalizar_status_on_off(status_painel.get(servico), padrao="ON")
+        for servico in servicos_controle_robos()
+    }
+
+    status_ecrv_base = status_base_ecrv_para_controle(status_painel, status_ecrv)
+    inicializar_chaves_controle_robos(status_painel, status_ecrv_base)
+
+    comando_ecrv = comando_ecrv or {}
+    ultimo_status_comando = str(comando_ecrv.get("status", "") or "").strip().upper()
+    ultimo_comando_id = str(comando_ecrv.get("id", "") or "").strip()
+
+    status_rpa_txt = "Sem confirmação do RPA"
+    if isinstance(status_ecrv, dict) and status_ecrv:
+        status_rpa_txt = (
+            f"Atualizado em {status_ecrv.get('atualizado_em', '-')}"
+            f" | último comando: {status_ecrv.get('ultimo_comando_status', '-')}"
+        )
+
+    st.markdown('<div class="controle-page-wrap">', unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+<div class="controle-grid-status">
+    <div class="controle-status-card">
+        <div class="controle-status-card-title">Último comando e-CRV/RPA</div>
+        <div class="controle-status-card-value">
+            Status: {html.escape(ultimo_status_comando or "Sem comando")}<br>
+            ID: {html.escape(ultimo_comando_id or "-")}
+        </div>
+    </div>
+    <div class="controle-status-card">
+        <div class="controle-status-card-title">Confirmação recebida do RPA</div>
+        <div class="controle-status-card-value">{html.escape(status_rpa_txt)}</div>
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    if ultimo_status_comando == "PENDENTE":
+        st.warning("Há comando pendente para o RPA processar. Evite enviar novo comando antes do retorno, salvo necessidade operacional.")
+
+    st.markdown('<div class="controle-form-card">', unsafe_allow_html=True)
+
+    toggle_fn = getattr(st, "toggle", st.checkbox)
+
+    with st.form("form_controle_robos"):
+        col_dash, col_ecrv = st.columns(2)
+
+        with col_dash:
+            st.markdown('<div class="controle-section-title">Dashboard</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="controle-section-desc">Altera somente o status visual do painel. Não executa ação no e-CRV.</div>',
+                unsafe_allow_html=True,
+            )
+
+            dash_valores = {}
+            for servico in servicos_controle_robos():
+                dash_valores[servico] = toggle_fn(
+                    servico,
+                    key=f"dash_{servico}",
+                )
+
+        with col_ecrv:
+            st.markdown('<div class="controle-section-title">e-CRV</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="controle-section-desc">Grava comando no GitHub para o RPA de monitoramento executar/confirmar depois.</div>',
+                unsafe_allow_html=True,
+            )
+
+            ecrv_valores = {}
+            for servico in servicos_controle_robos():
+                ecrv_valores[servico] = toggle_fn(
+                    servico,
+                    key=f"ecrv_{servico}",
+                )
+
+        st.markdown("---")
+        col_aplicar, col_sair = st.columns([1, 1])
+        with col_aplicar:
+            aplicar = st.form_submit_button("Aplicar", type="primary", use_container_width=True)
+        with col_sair:
+            sair = st.form_submit_button("Bloquear acesso", use_container_width=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if sair:
+        st.session_state["controle_robos_autorizado"] = False
+        st.session_state["senha_controle_robos"] = ""
+        rerun_streamlit()
+        return
+
+    if not aplicar:
+        st.markdown(
+            f"""
+<div class="controle-alerta">
+    <b>Observação:</b> os botões abrem com base no status atual exibido no card Robôs.<br>
+    O status real do e-CRV somente será considerado confirmado após o RPA atualizar
+    <b>{html.escape(GITHUB_ARQ_STATUS_ECRV)}</b>.
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    agora = agora_sao_paulo()
+    agora_txt = agora.strftime("%d/%m/%Y %H:%M:%S")
+
+    # 1) Controle visual do Dashboard.
+    st.session_state["controle_dash_status"] = {
+        servico: ("ON" if ativo else "OFF")
+        for servico, ativo in dash_valores.items()
+    }
+    st.session_state["controle_dash_ts"] = agora
+    st.session_state["controle_dash_ate"] = agora + pd.Timedelta(
+        minutes=TEMPO_MINIMO_OFF_MINUTOS
+    )
+
+    # 2) Comando real/sinal para o RPA via GitHub.
+    servicos_desejados = {
+        servico: ("ON" if ativo else "OFF")
+        for servico, ativo in ecrv_valores.items()
+    }
+
+    acoes = []
+    for servico, status_desejado in servicos_desejados.items():
+        status_anterior = status_ecrv_base.get(servico, status_painel.get(servico, "ON"))
+        status_anterior = normalizar_status_on_off(status_anterior, padrao="ON")
+
+        if status_anterior != status_desejado:
+            acoes.append({
+                "servico": servico,
+                "acao": "LIGAR" if status_desejado == "ON" else "DESLIGAR",
+                "status_anterior": status_anterior,
+                "status_desejado": status_desejado,
+            })
+
+    payload = {
+        "id": agora.strftime("%Y%m%d_%H%M%S"),
+        "origem": "dashboard",
+        "tipo": "CONTROLE_ROBOS",
+        "status": "PENDENTE",
+        "solicitado_em": agora_txt,
+        "expira_em": (agora + pd.Timedelta(minutes=30)).strftime("%d/%m/%Y %H:%M:%S"),
+        "servicos_desejados": servicos_desejados,
+        "acoes": acoes,
+        "observacao": (
+            "Comando gerado pelo dashboard. O RPA de monitoramento deve ler este arquivo, "
+            "executar as ações aplicáveis no STOP Processo/e-CRV ou no próprio monitoramento, "
+            "e gravar o retorno em status/status_ecrv.json."
+        ),
+    }
+
+    ok, msg = salvar_json_github(
+        GITHUB_ARQ_CONTROLE_ECRV,
+        payload,
+        f"Controle robôs dashboard {payload['id']}",
+    )
+
+    if ok:
+        st.success("Controle do Dashboard aplicado e comando gravado no GitHub para o RPA processar.")
+    else:
+        st.warning("Controle do Dashboard aplicado, mas o comando para o RPA não foi gravado no GitHub.")
+        st.error(msg)
+
+    st.markdown(
+        f"""
+<div class="controle-alerta">
+    <b>Resultado:</b> {html.escape(msg)}<br>
+    <span class="controle-mini-note">
+        O status real do e-CRV será considerado confirmado somente após o RPA atualizar
+        <b>{html.escape(GITHUB_ARQ_STATUS_ECRV)}</b>.
+    </span>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
 
 def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigatorio: bool = False):
     """
@@ -3638,6 +4453,40 @@ total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
 
 robos = status_robos(df, df_criticas, df_hist)
 
+status_ecrv_rpa, meta_status_ecrv = carregar_json_github(
+    GITHUB_ARQ_STATUS_ECRV,
+    ARQ_LOCAL_STATUS_ECRV,
+    obrigatorio=False,
+)
+
+comando_ecrv_atual, meta_comando_ecrv = carregar_json_github(
+    GITHUB_ARQ_CONTROLE_ECRV,
+    ARQ_LOCAL_CONTROLE_ECRV,
+    obrigatorio=False,
+)
+
+# Reconhece status confirmado pelo RPA e, depois, aplica eventual controle
+# visual temporário feito no próprio Dashboard.
+robos, robo_monitoramento_online = aplicar_status_confirmado_rpa(
+    robos,
+    robo_monitoramento_online,
+    status_ecrv_rpa,
+    df_criticas,
+    df_hist,
+)
+
+robos, robo_monitoramento_online = aplicar_controle_dashboard_manual(
+    robos,
+    robo_monitoramento_online,
+    df_criticas,
+    df_hist,
+)
+
+status_painel_robos = status_card_robos(
+    robos,
+    robo_monitoramento_online,
+)
+
 enviar_alerta_robo_ecrv_off(
     robo_monitoramento_online,
     minutos_sem_atualizacao
@@ -4019,6 +4868,14 @@ if pagina == "Monitoramento atual":
 
 
 
+elif pagina == "Ligar/Desligar":
+    render_controle_robos(
+        status_painel_robos,
+        status_ecrv_rpa,
+        comando_ecrv_atual,
+    )
+
+
 elif pagina == "Logs":
     st.markdown(
         '''
@@ -4326,5 +5183,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-time.sleep(INTERVALO_VERIFICACAO_SEGUNDOS)
-st.rerun()
+if pagina != "Ligar/Desligar":
+    time.sleep(INTERVALO_VERIFICACAO_SEGUNDOS)
+    st.rerun()
