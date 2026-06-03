@@ -680,6 +680,43 @@ button[kind="header"] {
         width: fit-content;
     }
 }
+
+/* =========================
+   ALERTA VISUAL - CRÍTICAS / ROBÔS OFF
+========================= */
+
+@keyframes piscar-borda-alerta {
+    0% {
+        opacity: 1;
+        box-shadow: 0 0 0 rgba(217, 48, 37, 0);
+    }
+    50% {
+        opacity: 0.30;
+        box-shadow: 0 0 18px rgba(217, 48, 37, 0.85);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 0 rgba(217, 48, 37, 0);
+    }
+}
+
+.kpi-card.kpi-alerta-critico {
+    position: relative !important;
+}
+
+.kpi-card.kpi-alerta-critico::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 9px;
+    background: var(--md-red);
+    border-radius: 24px 0 0 24px;
+    animation: piscar-borda-alerta 0.9s infinite;
+    z-index: 5;
+}
+
 </style>
 """
 
@@ -2561,17 +2598,27 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     status_t3 = status_dict.get("Transferência 3", "ON")
     status_monitoramento = "ON" if robo_monitoramento_online else "OFF"
 
+    def normalizar_status(status):
+        return str(status or "").strip().upper()
+
     def bolinha(status):
-        return "🟢" if status == "ON" else "🔴"
+        return "🟢" if normalizar_status(status) == "ON" else "🔴"
 
     def cor(status):
-        return "#188038" if status == "ON" else "#D93025"
+        return "#188038" if normalizar_status(status) == "ON" else "#D93025"
 
     todos_status = [status_t2, status_t3, status_0km, status_monitoramento]
-    cor_borda_robos = "#188038" if all(s == "ON" for s in todos_status) else "#D93025"
+
+    tem_robo_off = any(
+        normalizar_status(s) == "OFF"
+        for s in todos_status
+    )
+
+    cor_borda_robos = "#D93025" if tem_robo_off else "#188038"
+    classe_alerta_robos = " kpi-alerta-critico" if tem_robo_off else ""
 
     html = f"""
-    <div class="kpi-card kpi-robos-tall" style="
+    <div class="kpi-card kpi-robos-tall{classe_alerta_robos}" style="
         box-shadow: inset 7px 0 0 0 {cor_borda_robos}, var(--md-shadow) !important;
         overflow:hidden !important;
     ">
@@ -2594,6 +2641,7 @@ def render_robos_card(status_dict, robo_monitoramento_online=True):
     """
 
     st.markdown(html, unsafe_allow_html=True)
+
 
 def enviar_alerta_robo_ecrv_off(
     robo_monitoramento_online,
@@ -3707,7 +3755,11 @@ if pagina == "Monitoramento atual":
             total_criticas_minuto,
             cor_criticas_minuto(total_criticas_minuto),
             "Total de críticas do minuto atual",
-            extra_class="kpi-tall",
+            extra_class=(
+                "kpi-tall kpi-alerta-critico"
+                if int(total_criticas_minuto or 0) > 0
+                else "kpi-tall"
+            ),
         )
         render_robos_card(robos, robo_monitoramento_online)
 
