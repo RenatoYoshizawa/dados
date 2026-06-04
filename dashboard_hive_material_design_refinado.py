@@ -4176,7 +4176,40 @@ def _preparar_historico_full_ultimo_ciclo(df_hist: pd.DataFrame) -> pd.DataFrame
     out["_chave_servico"] = out["Serviço"].apply(_servico_para_chave)
     return out
 
+def houve_aumento_inconsistencias_no_ultimo_ciclo(df_monitor: pd.DataFrame) -> bool:
+    """
+    Verifica se houve aumento real de inconsistências no último ciclo do Monitoramento.xlsx.
 
+    Evita exibir no Top 5 inconsistências antigas gravadas no histórico,
+    quando o total atual do painel não aumentou no último ciclo.
+    """
+    if df_monitor is None or df_monitor.empty or len(df_monitor) < 2:
+        return False
+
+    atual = df_monitor.iloc[-1]
+    anterior = df_monitor.iloc[-2]
+
+    colunas_incons = [
+        "Inconsistência 2 e 3",
+        "Inconsistência 0km",
+        "Inconsistencia TDV",
+    ]
+
+    for col in colunas_incons:
+        if col not in df_monitor.columns:
+            continue
+
+        valor_atual = pd.to_numeric(atual.get(col, 0), errors="coerce")
+        valor_anterior = pd.to_numeric(anterior.get(col, 0), errors="coerce")
+
+        valor_atual = 0 if pd.isna(valor_atual) else int(valor_atual)
+        valor_anterior = 0 if pd.isna(valor_anterior) else int(valor_anterior)
+
+        if valor_atual > valor_anterior:
+            return True
+
+    return False
+    
 def tabela_top3_ciclo_atual(df_hist: pd.DataFrame) -> pd.DataFrame:
     base = _preparar_historico_full_ultimo_ciclo(df_hist)
     if base.empty:
@@ -4874,7 +4907,10 @@ if pagina == "Monitoramento atual":
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Inconsistências - Top 5 - Ciclo atual (10 min)</div>', unsafe_allow_html=True)
 
-    df_top3 = tabela_top3_ciclo_atual(df_hist_hoje)
+    if houve_aumento_inconsistencias_no_ultimo_ciclo(df):
+        df_top3 = tabela_top3_ciclo_atual(df_hist_hoje)
+    else:
+        df_top3 = pd.DataFrame(columns=["Serviço", "Descrição", "Quantidade no ciclo"])
     
     if df_top3.empty:
         render_mensagem_tabela("Não foram identificadas inconsistências com aumento no ciclo atual.")
