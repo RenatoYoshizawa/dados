@@ -193,7 +193,8 @@ def resolver_por_numero_ou_palavra(msg_norm, mapa, campo=None, tipo_opcao="opç�
     for _, codigo, nome, valor in candidatos_proximos:
         if isinstance(valor, dict) and "preco" in valor:
             unidade = f" ({valor.get('unidade', '')})" if valor.get("unidade") else ""
-            linhas.append(f"{codigo} - {nome}{unidade} - {moeda(valor['preco'])}")
+            status = "" if valor.get("disponivel", True) else " - INDISPONÍVEL"
+            linhas.append(f"{codigo} - {nome}{unidade} - {moeda(valor['preco'])}{status}")
         elif isinstance(valor, dict) and "taxa" in valor:
             linhas.append(f"{codigo} - {nome} - Taxa {moeda(valor['taxa'])}")
         else:
@@ -319,16 +320,16 @@ def carregar_cardapio():
         disponivel = sim(obter(linha, "Disponível", "Disponivel", padrao="SIM"))
         observacao = texto(obter(linha, "Observação", "Observacao", "Descrição", "Descricao"))
 
-        if disponivel:
-            cardapio.append({
-                "codigo_original": codigo,
-                "categoria": categoria,
-                "produto": produto,
-                "unidade": unidade,
-                "preco": preco,
-                "observacao": observacao,
-                "tipo": "produto",
-            })
+        cardapio.append({
+            "codigo_original": codigo,
+            "categoria": categoria,
+            "produto": produto,
+            "unidade": unidade,
+            "preco": preco,
+            "observacao": observacao,
+            "tipo": "produto",
+            "disponivel": disponivel,
+        })
 
     combos = carregar_aba_excel(ARQUIVO_CONFIG, "Combos_Promocoes")
 
@@ -340,8 +341,6 @@ def carregar_cardapio():
             continue
 
         disponivel = sim(obter(linha, "Disponível", "Disponivel", padrao="SIM"))
-        if not disponivel:
-            continue
 
         itens = texto(obter(linha, "Itens sugeridos", "Itens", "Descrição", "Descricao"))
         preco = dinheiro(obter(linha, "Preço", "Preco", "Valor"))
@@ -354,6 +353,7 @@ def carregar_cardapio():
             "preco": preco,
             "observacao": itens,
             "tipo": "combo",
+            "disponivel": disponivel,
         })
 
     return cardapio
@@ -755,7 +755,8 @@ def texto_produtos(categoria):
         st.session_state.mapa_produtos[codigo] = item
         unidade = f" ({item['unidade']})" if item.get("unidade") else ""
         obs = f" - {item['observacao']}" if item.get("observacao") else ""
-        linhas.append(f"{codigo} - {item['produto']}{unidade} - {moeda(item['preco'])}{obs}")
+        status = "" if item.get("disponivel", True) else " - INDISPONÍVEL NO MOMENTO"
+        linhas.append(f"{codigo} - {item['produto']}{unidade} - {moeda(item['preco'])}{obs}{status}")
 
     linhas.append("\nDigite o número do item desejado.")
     linhas.append("0 - Voltar às categorias")
@@ -1032,6 +1033,14 @@ def processar_mensagem(msg):
             return "Produto inválido.\n\n" + texto_produtos(st.session_state.categoria_atual)
 
         produto = mapa[chave]
+
+        if not produto.get("disponivel", True):
+            return (
+                f"O item **{produto['produto']}** está indisponível no momento.\n\n"
+                "Por favor, escolha outro item:\n\n"
+                + texto_produtos(st.session_state.categoria_atual)
+            )
+
         st.session_state.produto_atual = produto
         st.session_state.etapa = "quantidade"
 
