@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from difflib import SequenceMatcher
 import re
 import unicodedata
 
@@ -95,6 +96,175 @@ def obter(linha, *nomes, padrao=""):
         if chave in linha and linha[chave] not in [None, ""]:
             return linha[chave]
     return padrao
+
+
+def contem_alguma(entrada, termos):
+    entrada = normalizar_texto(entrada)
+    return any(normalizar_texto(t) in entrada for t in termos)
+
+
+def solicitar_atendente(msg_norm):
+    termos = [
+        "atendente",
+        "falar com atendente",
+        "humano",
+        "pessoa",
+        "falar com alguem",
+        "falar com alguém",
+        "suporte",
+        "ajuda",
+        "preciso de ajuda",
+    ]
+    return contem_alguma(msg_norm, termos)
+
+
+def pontuar_texto(entrada, alvo):
+    entrada = normalizar_texto(entrada)
+    alvo = normalizar_texto(alvo)
+
+    if not entrada or not alvo:
+        return 0
+
+    if entrada == alvo:
+        return 1.0
+
+    if entrada in alvo or alvo in entrada:
+        return 0.92
+
+    tokens_entrada = set(entrada.split())
+    tokens_alvo = set(alvo.split())
+
+    if tokens_entrada and tokens_alvo:
+        intersecao = tokens_entrada.intersection(tokens_alvo)
+        score_tokens = len(intersecao) / max(len(tokens_entrada), 1)
+    else:
+        score_tokens = 0
+
+    score_similaridade = SequenceMatcher(None, entrada, alvo).ratio()
+
+    return max(score_tokens, score_similaridade)
+
+
+def resolver_por_numero_ou_palavra(msg_norm, mapa, campo=None, tipo_opcao="opção"):
+    """
+    Aceita número ou palavra-chave.
+
+    Retorna:
+    - ("ok", chave, "")
+    - ("ambigua", None, mensagem)
+    - ("nao_encontrado", None, "")
+    """
+    msg_norm = normalizar_texto(msg_norm)
+
+    # Padrão principal: número
+    if msg_norm in mapa:
+        return "ok", msg_norm, ""
+
+    candidatos = []
+
+    for codigo, valor in mapa.items():
+        if isinstance(valor, dict) and campo:
+            nome = texto(valor.get(campo, ""))
+        else:
+            nome = texto(valor)
+
+        score = pontuar_texto(msg_norm, nome)
+
+        if score >= 0.70:
+            candidatos.append((score, codigo, nome, valor))
+
+    if not candidatos:
+        return "nao_encontrado", None, ""
+
+    candidatos.sort(reverse=True, key=lambda x: x[0])
+    melhor_score = candidatos[0][0]
+
+    # Se houver opções muito próximas, pergunta qual é a correta
+    candidatos_proximos = [
+        item for item in candidatos
+        if melhor_score - item[0] <= 0.08 or item[0] >= 0.90
+    ]
+
+    if len(candidatos_proximos) == 1:
+        return "ok", candidatos_proximos[0][1], ""
+
+    linhas = [f"Encontrei mais de uma {tipo_opcao}. Qual é a correta?\n"]
+
+    for _, codigo, nome, valor in candidatos_proximos:
+        if isinstance(valor, dict) and "preco" in valor:
+            unidade = f" ({valor.get('unidade', '')})" if valor.get("unidade") else ""
+            linhas.append(f"{codigo} - {nome}{unidade} - {moeda(valor['preco'])}")
+        elif isinstance(valor, dict) and "taxa" in valor:
+            linhas.append(f"{codigo} - {nome} - Taxa {moeda(valor['taxa'])}")
+        else:
+            linhas.append(f"{codigo} - {nome}")
+
+    linhas.append("\nDigite o número da opção correta.")
+
+    return "ambigua", None, "\n".join(linhas)
+
+
+def interpretar_menu(msg_norm):
+    msg_norm = normalizar_texto(msg_norm)
+
+    if msg_norm in ["1", "2", "3", "4"]:
+        return msg_norm
+
+    if contem_alguma(msg_norm, ["pedido", "pedir", "comprar", "quero pedir", "fazer pedido"]):
+        return "1"
+
+    if contem_alguma(msg_norm, ["cardapio", "cardápio", "menu", "preco", "preço", "valores"]):
+        return "2"
+
+    if contem_alguma(msg_norm, ["horario", "horário", "funcionamento", "abre", "fecha"]):
+        return "3"
+
+    if solicitar_atendente(msg_norm):
+        return "4"
+
+    return ""
+
+
+def interpretar_sim_nao(msg_norm):
+    msg_norm = normalizar_texto(msg_norm)
+
+    if msg_norm in ["1", "sim", "s", "confirmo", "confirmar", "ok", "pode", "isso", "correto"]:
+        return "sim"
+
+    if msg_norm in ["2", "nao", "não", "n", "cancelar", "cancela", "errado"]:
+        return "nao"
+
+    return ""
+
+
+def interpretar_tipo_entrega(msg_norm):
+    msg_norm = normalizar_texto(msg_norm)
+
+    if msg_norm == "1" or contem_alguma(msg_norm, ["retirada", "retirar", "buscar", "busco", "loja"]):
+        return "retirada"
+
+    if msg_norm == "2" or contem_alguma(msg_norm, ["entrega", "entregar", "delivery", "endereco", "endereço"]):
+        return "entrega"
+
+    return ""
+
+
+def interpretar_mais_itens(msg_norm):
+    msg_norm = normalizar_texto(msg_norm)
+
+    if msg_norm == "1" or contem_alguma(msg_norm, ["mesma", "mesma categoria", "outro item", "mais um"]):
+        return "mesma_categoria"
+
+    if msg_norm == "2" or contem_alguma(msg_norm, ["outra categoria", "categoria", "outro tipo"]):
+        return "outra_categoria"
+
+    if msg_norm == "3" or contem_alguma(msg_norm, ["resumo", "ver pedido", "parcial"]):
+        return "resumo"
+
+    if msg_norm == "4" or contem_alguma(msg_norm, ["finalizar", "fechar", "concluir", "nao", "não", "só isso", "so isso"]):
+        return "finalizar"
+
+    return ""
 
 
 @st.cache_data(show_spinner=False)
@@ -558,6 +728,7 @@ def texto_menu():
         "Digite o número da opção desejada."
     )
 
+
 def texto_categorias():
     categorias = listar_categorias()
     st.session_state.mapa_categorias = {}
@@ -737,6 +908,15 @@ def processar_mensagem(msg):
     msg_original = msg.strip()
     msg_norm = normalizar_texto(msg_original)
 
+    # Atendente em qualquer etapa do atendimento
+    if solicitar_atendente(msg_norm):
+        st.session_state.etapa = "atendente"
+        st.session_state.mostrar_imagem_cardapio = False
+        return (
+            "Encaminhando para o atendente.\n\n"
+            "Um atendente dará continuidade ao atendimento."
+        )
+
     if msg_norm in ["0", "menu", "inicio", "início", "reiniciar"]:
         reiniciar_atendimento(mensagem_inicial=False)
         st.session_state.etapa = "menu"
@@ -749,30 +929,33 @@ def processar_mensagem(msg):
         return texto_menu()
 
     if etapa == "menu":
-        if msg_norm == "1":
+        opcao_menu = interpretar_menu(msg_norm)
+
+        if opcao_menu == "1":
             st.session_state.etapa = "categoria"
             st.session_state.mostrar_imagem_cardapio = False
             return texto_categorias()
 
-        if msg_norm == "2":
+        if opcao_menu == "2":
             st.session_state.mostrar_imagem_cardapio = True
             return (
                 "Claro! Segue a foto do cardápio.\n\n"
                 "Para fazer um pedido, digite **1**.\n"
                 "Para voltar ao menu, digite **0**."
             )
-    
-        if msg_norm == "3":
+
+        if opcao_menu == "3":
             st.session_state.mostrar_imagem_cardapio = False
             return texto_horarios()
-    
-        if msg_norm == "4":
+
+        if opcao_menu == "4":
             st.session_state.mostrar_imagem_cardapio = False
+            st.session_state.etapa = "atendente"
             return (
-                "Certo. Um atendente continuará o atendimento.\n"
-                f"Telefone do atendente: {telefone_atendente()}"
+                "Encaminhando para o atendente.\n\n"
+                "Um atendente dará continuidade ao atendimento."
             )
-    
+
         return "Opção inválida.\n\n" + texto_menu()
 
     if etapa == "categoria":
@@ -782,10 +965,20 @@ def processar_mensagem(msg):
             texto_categorias()
             mapa = st.session_state.mapa_categorias
 
-        if msg_norm not in mapa:
+        status, chave, mensagem_ambigua = resolver_por_numero_ou_palavra(
+            msg_norm,
+            mapa,
+            campo=None,
+            tipo_opcao="categoria"
+        )
+
+        if status == "ambigua":
+            return mensagem_ambigua
+
+        if status != "ok":
             return "Categoria inválida.\n\n" + texto_categorias()
 
-        categoria = mapa[msg_norm]
+        categoria = mapa[chave]
         st.session_state.categoria_atual = categoria
 
         if categoria_exige_maioridade(categoria):
@@ -802,11 +995,13 @@ def processar_mensagem(msg):
         return texto_produtos(categoria)
 
     if etapa == "maioridade":
-        if msg_norm == "1":
+        resposta_sim_nao = interpretar_sim_nao(msg_norm)
+
+        if resposta_sim_nao == "sim":
             st.session_state.etapa = "produto"
             return texto_produtos(st.session_state.categoria_atual)
 
-        if msg_norm == "2":
+        if resposta_sim_nao == "nao":
             st.session_state.etapa = "categoria"
             return "Categoria não liberada.\n\n" + texto_categorias()
 
@@ -823,10 +1018,20 @@ def processar_mensagem(msg):
             texto_produtos(st.session_state.categoria_atual)
             mapa = st.session_state.mapa_produtos
 
-        if msg_norm not in mapa:
+        status, chave, mensagem_ambigua = resolver_por_numero_ou_palavra(
+            msg_norm,
+            mapa,
+            campo="produto",
+            tipo_opcao="opção de produto"
+        )
+
+        if status == "ambigua":
+            return mensagem_ambigua
+
+        if status != "ok":
             return "Produto inválido.\n\n" + texto_produtos(st.session_state.categoria_atual)
 
-        produto = mapa[msg_norm]
+        produto = mapa[chave]
         st.session_state.produto_atual = produto
         st.session_state.etapa = "quantidade"
 
@@ -855,18 +1060,20 @@ def processar_mensagem(msg):
         return "Item adicionado ao pedido.\n\n" + texto_pergunta_mais_itens()
 
     if etapa == "mais_itens":
-        if msg_norm == "1":
+        acao = interpretar_mais_itens(msg_norm)
+
+        if acao == "mesma_categoria":
             st.session_state.etapa = "produto"
             return texto_produtos(st.session_state.categoria_atual)
 
-        if msg_norm == "2":
+        if acao == "outra_categoria":
             st.session_state.etapa = "categoria"
             return texto_categorias()
 
-        if msg_norm == "3":
+        if acao == "resumo":
             return texto_resumo_parcial() + "\n\n" + texto_pergunta_mais_itens()
 
-        if msg_norm == "4":
+        if acao == "finalizar":
             if not st.session_state.pedido:
                 st.session_state.etapa = "categoria"
                 return "Pedido sem itens.\n\n" + texto_categorias()
@@ -877,7 +1084,9 @@ def processar_mensagem(msg):
         return "Opção inválida.\n\n" + texto_pergunta_mais_itens()
 
     if etapa == "tipo_entrega":
-        if msg_norm == "1":
+        tipo = interpretar_tipo_entrega(msg_norm)
+
+        if tipo == "retirada":
             st.session_state.tipo_entrega = "Retirada"
             st.session_state.bairro = ""
             st.session_state.endereco = ""
@@ -885,7 +1094,7 @@ def processar_mensagem(msg):
             st.session_state.etapa = "nome_cliente"
             return "Informe o nome para identificação do pedido."
 
-        if msg_norm == "2":
+        if tipo == "entrega":
             st.session_state.tipo_entrega = "Entrega"
             st.session_state.etapa = "bairro"
             return texto_locais()
@@ -903,10 +1112,20 @@ def processar_mensagem(msg):
             st.session_state.etapa = "endereco"
             return "Digite o endereço completo para entrega."
 
-        if msg_norm not in mapa:
+        status, chave, mensagem_ambigua = resolver_por_numero_ou_palavra(
+            msg_norm,
+            mapa,
+            campo="bairro",
+            tipo_opcao="bairro/região"
+        )
+
+        if status == "ambigua":
+            return mensagem_ambigua
+
+        if status != "ok":
             return "Bairro/região não localizado.\n\n" + texto_locais()
 
-        local = mapa[msg_norm]
+        local = mapa[chave]
         st.session_state.bairro = local["bairro"]
         st.session_state.taxa_entrega = local["taxa"]
         st.session_state.etapa = "endereco"
@@ -944,10 +1163,20 @@ def processar_mensagem(msg):
             texto_pagamentos()
             mapa = st.session_state.mapa_pagamentos
 
-        if msg_norm not in mapa:
+        status, chave, mensagem_ambigua = resolver_por_numero_ou_palavra(
+            msg_norm,
+            mapa,
+            campo="forma",
+            tipo_opcao="forma de pagamento"
+        )
+
+        if status == "ambigua":
+            return mensagem_ambigua
+
+        if status != "ok":
             return "Forma de pagamento inválida.\n\n" + texto_pagamentos()
 
-        pagamento = mapa[msg_norm]
+        pagamento = mapa[chave]
         st.session_state.pagamento = pagamento["forma"]
 
         if pagamento["perguntar_troco"] or "dinheiro" in normalizar_texto(pagamento["forma"]):
@@ -968,7 +1197,9 @@ def processar_mensagem(msg):
         return texto_resumo_final()
 
     if etapa == "confirmacao":
-        if msg_norm == "1":
+        resposta_sim_nao = interpretar_sim_nao(msg_norm)
+
+        if resposta_sim_nao == "sim":
             numero, caminho = salvar_pedido_excel()
             st.session_state.numero_pedido = numero
             st.session_state.arquivo_pedido = str(caminho)
@@ -982,12 +1213,18 @@ def processar_mensagem(msg):
                 "Digite **novo** para iniciar outro atendimento."
             )
 
-        if msg_norm == "2":
+        if resposta_sim_nao == "nao":
             reiniciar_atendimento(mensagem_inicial=False)
             st.session_state.etapa = "inicio"
             return "Pedido cancelado. Envie **oi** para iniciar novamente."
 
         return "Opção inválida.\n\nConfirmar pedido?\n1 - Sim\n2 - Cancelar"
+
+    if etapa == "atendente":
+        return (
+            "Atendimento encaminhado.\n\n"
+            "Um atendente dará continuidade ao atendimento."
+        )
 
     if etapa == "final":
         if msg_norm in ["novo", "oi", "ola", "olá"]:
@@ -1063,18 +1300,20 @@ def exibir_sidebar():
         if st.session_state.numero_pedido:
             st.divider()
             st.markdown(f'<div class="pedido-numero">Pedido nº {st.session_state.numero_pedido}</div>', unsafe_allow_html=True)
-            st.caption(st.session_state.arquivo_pedido)
 
-            caminho = Path(st.session_state.arquivo_pedido)
-            if caminho.exists():
-                with open(caminho, "rb") as arquivo:
-                    st.download_button(
-                        "Baixar planilha do dia",
-                        data=arquivo,
-                        file_name=caminho.name,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                    )
+            if st.session_state.arquivo_pedido:
+                st.caption(st.session_state.arquivo_pedido)
+                caminho = Path(st.session_state.arquivo_pedido)
+
+                if caminho.exists() and caminho.is_file():
+                    with open(caminho, "rb") as arquivo:
+                        st.download_button(
+                            "Baixar planilha do dia",
+                            data=arquivo,
+                            file_name=caminho.name,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                        )
 
 
 def exibir_resumo_final_na_tela():
@@ -1112,24 +1351,26 @@ def placeholder_chat():
     placeholders = {
         "inicio": "Digite oi para iniciar...",
         "menu": "Digite 1, 2, 3 ou 4...",
-        "categoria": "Digite o número da categoria...",
+        "categoria": "Digite o número da categoria ou uma palavra...",
         "maioridade": "Digite 1 para sim ou 2 para não...",
-        "produto": "Digite o número do produto...",
+        "produto": "Digite o número do produto ou uma palavra...",
         "quantidade": "Digite a quantidade...",
         "mais_itens": "Digite 1, 2, 3 ou 4...",
         "tipo_entrega": "Digite 1 para retirada ou 2 para entrega...",
-        "bairro": "Digite o número do bairro/região...",
+        "bairro": "Digite o número ou nome do bairro/região...",
         "endereco": "Digite o endereço completo...",
         "nome_cliente": "Digite o nome do cliente...",
         "telefone_cliente": "Digite o telefone/WhatsApp...",
-        "pagamento": "Digite o número da forma de pagamento...",
+        "pagamento": "Digite o número ou nome da forma de pagamento...",
         "troco": "Digite o valor para troco ou NÃO...",
         "confirmacao": "Digite 1 para confirmar ou 2 para cancelar...",
+        "atendente": "Atendimento encaminhado...",
         "final": "Digite novo para iniciar outro atendimento...",
     }
 
     return placeholders.get(etapa, "Digite sua mensagem...")
-    
+
+
 def rolar_e_focar_chat():
     components.html(
         """
@@ -1137,13 +1378,11 @@ def rolar_e_focar_chat():
         function aplicarAjustes() {
             const doc = window.parent.document;
 
-            // Localiza o campo do chat
             const inputContainer =
                 doc.querySelector('[data-testid="stChatInput"]') ||
                 doc.querySelector('[data-testid="stChatInput"] textarea') ||
                 doc.querySelector('textarea[placeholder]');
 
-            // Rola diretamente até o campo do chat
             if (inputContainer) {
                 try {
                     inputContainer.scrollIntoView({
@@ -1154,7 +1393,6 @@ def rolar_e_focar_chat():
                 } catch (e) {}
             }
 
-            // Foca no textarea do chat
             const inputChat =
                 doc.querySelector('[data-testid="stChatInput"] textarea') ||
                 doc.querySelector('textarea[aria-label="Chat input"]') ||
@@ -1184,6 +1422,7 @@ def rolar_e_focar_chat():
         height=1,
     )
 
+
 def exibir_cardapio_imagem():
     if not st.session_state.get("mostrar_imagem_cardapio"):
         return
@@ -1202,6 +1441,7 @@ def exibir_cardapio_imagem():
             "Verifique se o arquivo `jmd.png` está no GitHub, na mesma pasta do app."
         )
 
+
 def main():
     aplicar_css()
     inicializar_estado()
@@ -1214,6 +1454,13 @@ def main():
             f"Arquivo `{ARQUIVO_CONFIG}` não encontrado. "
             "Coloque a planilha na mesma pasta do app antes de rodar."
         )
+
+        st.write("Arquivos encontrados nesta pasta:")
+        try:
+            st.write([p.name for p in BASE_DIR.iterdir()])
+        except Exception:
+            pass
+
         st.stop()
 
     if not carregar_cardapio():
