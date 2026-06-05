@@ -1124,30 +1124,43 @@ def rolar_e_focar_chat():
         function aplicarAjustes() {
             const doc = window.parent.document;
 
-            // Tenta rolar todos os possíveis containers do Streamlit
-            const elementos = [
+            // 1. Tenta localizar o marcador final do chat
+            const marcador = doc.getElementById("fim-do-chat");
+
+            // 2. Se não encontrar o marcador, tenta pegar a última mensagem do chat
+            const mensagens = doc.querySelectorAll('[data-testid="stChatMessage"]');
+            const ultimaMensagem = mensagens.length > 0 ? mensagens[mensagens.length - 1] : null;
+
+            const alvo = marcador || ultimaMensagem;
+
+            if (alvo) {
+                try {
+                    alvo.scrollIntoView({
+                        behavior: "smooth",
+                        block: "end",
+                        inline: "nearest"
+                    });
+                } catch (e) {}
+            }
+
+            // 3. Reforço: tenta rolar os containers principais do Streamlit
+            const containers = [
                 doc.scrollingElement,
                 doc.documentElement,
                 doc.body,
                 doc.querySelector('[data-testid="stAppViewContainer"]'),
                 doc.querySelector('section.main'),
-                doc.querySelector('.main')
+                doc.querySelector('.main'),
+                doc.querySelector('.block-container')
             ].filter(Boolean);
 
-            elementos.forEach((el) => {
+            containers.forEach((el) => {
                 try {
                     el.scrollTop = el.scrollHeight;
                 } catch (e) {}
             });
 
-            try {
-                window.parent.scrollTo({
-                    top: doc.body.scrollHeight,
-                    behavior: "smooth"
-                });
-            } catch (e) {}
-
-            // Tenta focar novamente no campo do chat
+            // 4. Mantém o foco no campo do chat
             const inputChat =
                 doc.querySelector('[data-testid="stChatInput"] textarea') ||
                 doc.querySelector('textarea[aria-label="Chat input"]') ||
@@ -1171,10 +1184,12 @@ def rolar_e_focar_chat():
         setTimeout(aplicarAjustes, 300);
         setTimeout(aplicarAjustes, 700);
         setTimeout(aplicarAjustes, 1200);
+        setTimeout(aplicarAjustes, 1800);
         </script>
         """,
         height=1,
     )
+    
 def main():
     aplicar_css()
     inicializar_estado()
@@ -1204,25 +1219,25 @@ def main():
                 conteudo = conteudo.replace("R$", "R\\$")
                 conteudo = conteudo.replace("\n", "  \n")
                 st.markdown(conteudo)
-        
-        rolar_e_focar_chat()
-        
+    
+        # Marcador invisível no final da conversa
+        st.markdown('<div id="fim-do-chat"></div>', unsafe_allow_html=True)
+    
         prompt = st.chat_input(
             placeholder_chat(),
             key="campo_chat_principal"
         )
-        
-        # Mantém a tela no final da conversa e tenta devolver o foco ao chat
+    
         rolar_e_focar_chat()
-        
+    
         if prompt:
             add_user(prompt)
             resposta = processar_mensagem(prompt)
             add_bot(resposta)
             st.rerun()
-
-    with col_final:
-        exibir_resumo_final_na_tela()
+    
+        with col_final:
+            exibir_resumo_final_na_tela()
 
 
 if __name__ == "__main__":
