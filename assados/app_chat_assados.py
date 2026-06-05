@@ -1117,27 +1117,64 @@ def placeholder_chat():
 
     return placeholders.get(etapa, "Digite sua mensagem...")
     
-def rolar_para_baixo():
+def rolar_e_focar_chat():
     components.html(
         """
         <script>
-        function scrollToBottom() {
+        function aplicarAjustes() {
             const doc = window.parent.document;
-            const scrollingElement = doc.scrollingElement || doc.documentElement;
-            scrollingElement.scrollTo({
-                top: scrollingElement.scrollHeight,
-                behavior: "smooth"
+
+            // Tenta rolar todos os possíveis containers do Streamlit
+            const elementos = [
+                doc.scrollingElement,
+                doc.documentElement,
+                doc.body,
+                doc.querySelector('[data-testid="stAppViewContainer"]'),
+                doc.querySelector('section.main'),
+                doc.querySelector('.main')
+            ].filter(Boolean);
+
+            elementos.forEach((el) => {
+                try {
+                    el.scrollTop = el.scrollHeight;
+                } catch (e) {}
             });
+
+            try {
+                window.parent.scrollTo({
+                    top: doc.body.scrollHeight,
+                    behavior: "smooth"
+                });
+            } catch (e) {}
+
+            // Tenta focar novamente no campo do chat
+            const inputChat =
+                doc.querySelector('[data-testid="stChatInput"] textarea') ||
+                doc.querySelector('textarea[aria-label="Chat input"]') ||
+                doc.querySelector('textarea[placeholder]') ||
+                doc.querySelector('textarea');
+
+            if (inputChat) {
+                try {
+                    inputChat.focus({ preventScroll: true });
+                    const tamanho = inputChat.value.length;
+                    inputChat.setSelectionRange(tamanho, tamanho);
+                } catch (e) {
+                    try {
+                        inputChat.focus();
+                    } catch (e2) {}
+                }
+            }
         }
 
-        setTimeout(scrollToBottom, 100);
-        setTimeout(scrollToBottom, 400);
-        setTimeout(scrollToBottom, 800);
+        setTimeout(aplicarAjustes, 100);
+        setTimeout(aplicarAjustes, 300);
+        setTimeout(aplicarAjustes, 700);
+        setTimeout(aplicarAjustes, 1200);
         </script>
         """,
-        height=0,
+        height=1,
     )
-
 def main():
     aplicar_css()
     inicializar_estado()
@@ -1168,10 +1205,16 @@ def main():
                 conteudo = conteudo.replace("\n", "  \n")
                 st.markdown(conteudo)
         
-        rolar_para_baixo()
+        rolar_e_focar_chat()
         
-        prompt = st.chat_input(placeholder_chat())
-
+        prompt = st.chat_input(
+            placeholder_chat(),
+            key="campo_chat_principal"
+        )
+        
+        # Mantém a tela no final da conversa e tenta devolver o foco ao chat
+        rolar_e_focar_chat()
+        
         if prompt:
             add_user(prompt)
             resposta = processar_mensagem(prompt)
