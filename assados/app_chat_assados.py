@@ -1141,7 +1141,10 @@ def main():
     with col_chat:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                conteudo = message["content"]
+                conteudo = conteudo.replace("R$", "R\\$")
+                conteudo = conteudo.replace("\n", "  \n")
+                st.markdown(conteudo)
 
         prompt = st.chat_input(placeholder_chat())
 
