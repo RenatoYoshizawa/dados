@@ -1231,27 +1231,6 @@ def main():
                 conteudo = conteudo.replace("R$", "R\\$")
                 conteudo = conteudo.replace("\n", "  \n")
                 st.markdown(conteudo)
-    
-        prompt = st.chat_input(
-            placeholder_chat(),
-            key="campo_chat_principal"
-        )
-    
-        rolar_e_focar_chat()
-    
-        if prompt:
-            add_user(prompt)
-            resposta = processar_mensagem(prompt)
-            add_bot(resposta)
-            st.rerun()
-    
-    with col_chat:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                conteudo = message["content"]
-                conteudo = conteudo.replace("R$", "R\\$")
-                conteudo = conteudo.replace("\n", "  \n")
-                st.markdown(conteudo)
 
         prompt = st.chat_input(
             placeholder_chat(),
