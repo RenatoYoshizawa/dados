@@ -14,8 +14,10 @@ from openpyxl.utils import get_column_letter
 # CONFIGURAÇÕES
 # ============================================================
 
-ARQUIVO_CONFIG = "config_assados.xlsx"
-PASTA_PEDIDOS = "pedidos"
+BASE_DIR = Path(__file__).resolve().parent
+
+ARQUIVO_CONFIG = BASE_DIR / "config_assados.xlsx"
+PASTA_PEDIDOS = BASE_DIR / "pedidos"
 
 st.set_page_config(
     page_title="Chatbot JMD Assados",
