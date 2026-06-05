@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 import unicodedata
 
+import streamlit.components.v1 as components
+
 import pandas as pd
 import streamlit as st
 from openpyxl import Workbook, load_workbook
@@ -1114,7 +1116,27 @@ def placeholder_chat():
     }
 
     return placeholders.get(etapa, "Digite sua mensagem...")
+    
+def rolar_para_baixo():
+    components.html(
+        """
+        <script>
+        function scrollToBottom() {
+            const doc = window.parent.document;
+            const scrollingElement = doc.scrollingElement || doc.documentElement;
+            scrollingElement.scrollTo({
+                top: scrollingElement.scrollHeight,
+                behavior: "smooth"
+            });
+        }
 
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 400);
+        setTimeout(scrollToBottom, 800);
+        </script>
+        """,
+        height=0,
+    )
 
 def main():
     aplicar_css()
@@ -1145,7 +1167,9 @@ def main():
                 conteudo = conteudo.replace("R$", "R\\$")
                 conteudo = conteudo.replace("\n", "  \n")
                 st.markdown(conteudo)
-
+        
+        rolar_para_baixo()
+        
         prompt = st.chat_input(placeholder_chat())
 
         if prompt:
