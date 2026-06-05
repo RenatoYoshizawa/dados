@@ -20,6 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 ARQUIVO_CONFIG = BASE_DIR / "config_assados.xlsx"
 PASTA_PEDIDOS = BASE_DIR / "pedidos"
+ARQUIVO_CARDAPIO_PDF = BASE_DIR / "cardapio_jmd.pdf"
 
 st.set_page_config(
     page_title="Chatbot JMD Assados",
@@ -492,6 +493,7 @@ def estado_padrao():
         "taxa_entrega": 0.0,
         "numero_pedido": "",
         "arquivo_pedido": "",
+        "mostrar_pdf_cardapio": False,
         "mapa_categorias": {},
         "mapa_produtos": {},
         "mapa_locais": {},
@@ -550,11 +552,11 @@ def texto_menu():
     return (
         "Escolha uma opção:\n\n"
         "1 - Fazer pedido\n"
-        "2 - Consultar horário de funcionamento\n"
-        "3 - Falar com atendente\n\n"
+        "2 - Ver cardápio em PDF\n"
+        "3 - Consultar horário de funcionamento\n"
+        "4 - Falar com atendente\n\n"
         "Digite o número da opção desejada."
     )
-
 
 def texto_categorias():
     categorias = listar_categorias()
@@ -749,17 +751,28 @@ def processar_mensagem(msg):
     if etapa == "menu":
         if msg_norm == "1":
             st.session_state.etapa = "categoria"
+            st.session_state.mostrar_pdf_cardapio = False
             return texto_categorias()
-
+    
         if msg_norm == "2":
-            return texto_horarios()
-
+            st.session_state.mostrar_pdf_cardapio = True
+            return (
+                "Claro! Segue o cardápio em PDF.\n\n"
+                "Para fazer um pedido, digite **1**.\n"
+                "Para voltar ao menu, digite **0**."
+            )
+    
         if msg_norm == "3":
+            st.session_state.mostrar_pdf_cardapio = False
+            return texto_horarios()
+    
+        if msg_norm == "4":
+            st.session_state.mostrar_pdf_cardapio = False
             return (
                 "Certo. Um atendente continuará o atendimento.\n"
                 f"Telefone do atendente: {telefone_atendente()}"
             )
-
+    
         return "Opção inválida.\n\n" + texto_menu()
 
     if etapa == "categoria":
@@ -1098,7 +1111,7 @@ def placeholder_chat():
 
     placeholders = {
         "inicio": "Digite oi para iniciar...",
-        "menu": "Digite 1, 2 ou 3...",
+        "menu": "Digite 1, 2, 3 ou 4...",
         "categoria": "Digite o número da categoria...",
         "maioridade": "Digite 1 para sim ou 2 para não...",
         "produto": "Digite o número do produto...",
@@ -1170,7 +1183,28 @@ def rolar_e_focar_chat():
         """,
         height=1,
     )
-    
+
+def exibir_cardapio_pdf():
+    if not st.session_state.get("mostrar_pdf_cardapio"):
+        return
+
+    st.markdown("### 📄 Cardápio em PDF")
+
+    if ARQUIVO_CARDAPIO_PDF.exists():
+        with open(ARQUIVO_CARDAPIO_PDF, "rb") as arquivo:
+            st.download_button(
+                label="Baixar cardápio em PDF",
+                data=arquivo,
+                file_name="cardapio_jmd.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+    else:
+        st.warning(
+            "Arquivo do cardápio em PDF não encontrado. "
+            "Verifique se `cardapio_jmd.pdf` está no GitHub, na mesma pasta do app."
+        )
+
 def main():
     aplicar_css()
     inicializar_estado()
@@ -1215,6 +1249,7 @@ def main():
             st.rerun()
     
         with col_final:
+            exibir_cardapio_pdf()
             exibir_resumo_final_na_tela()
 
 
