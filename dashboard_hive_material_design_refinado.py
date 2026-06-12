@@ -4535,7 +4535,7 @@ try:
 except Exception:
     tdv_hora = 0
 
-total_sucesso = sucesso_trf + sucesso_0km
+total_sucesso = sucesso_trf + sucesso_0km + sucesso_tdv
 total_criticas_minuto = obter_total_criticas_minuto(df_criticas)
 
 robos = status_robos(df, df_criticas, df_hist)
