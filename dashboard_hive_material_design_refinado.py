@@ -3262,6 +3262,43 @@ def cor_card_sucesso(metricas: dict) -> str:
 
     return COR_VERDE
 
+def cor_card_sucesso_transferencias(metricas: dict) -> str:
+    """
+    Cor do card de Sucesso Transferências.
+
+    Regra:
+    - fila menor que 250: verde;
+    - fila igual ou maior que 250:
+        - sucesso nos últimos 60 min >= 250: verde;
+        - sucesso nos últimos 60 min entre 200 e 249: amarelo;
+        - sucesso nos últimos 60 min < 200: vermelho.
+    """
+    fila_atual = int(
+        metricas.get("fila_atual")
+        or 0
+    )
+
+    sucesso_60 = metricas.get("sucesso_60")
+
+    # Com fila abaixo de 250, não cobra produtividade mínima.
+    if fila_atual < 250:
+        return COR_VERDE
+
+    # Há fila suficiente, mas ainda não existem dados completos
+    # dos últimos 60 minutos.
+    if sucesso_60 is None:
+        return COR_AZUL
+
+    sucesso_60 = int(sucesso_60)
+
+    if sucesso_60 >= 250:
+        return COR_VERDE
+
+    if sucesso_60 >= 200:
+        return COR_AMARELO
+
+    return COR_VERMELHO
+
 
 def nota_card_inconsistencia(metricas: dict) -> str:
     taxa_60 = metricas.get("taxa_inconsistencia_60")
@@ -5317,7 +5354,7 @@ if pagina == "Monitoramento atual":
         render_card(
             "Sucesso Transferências",
             sucesso_trf,
-            cor_card_sucesso(metricas_trf),
+            cor_card_sucesso_transferencias(metricas_trf),
             nota_card_sucesso(metricas_trf),
         )
         render_card(
