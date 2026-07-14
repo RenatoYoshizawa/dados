@@ -118,6 +118,48 @@ JANELA_STATUS_RPA_MINUTOS = 60  # usa confirmação do RPA somente se for recent
 
 
 # =========================
+# PARÂMETROS DOS CARDS DINÂMICOS
+# =========================
+
+COR_VERDE = "#188038"
+COR_AMARELO = "#F9AB00"
+COR_VERMELHO = "#D93025"
+COR_AZUL = "#1A73E8"
+
+# Taxas máximas de inconsistência nos últimos 60 minutos.
+LIMITES_INCONSISTENCIA = {
+    "Transferências": {
+        "verde": 12.0,
+        "amarelo": 14.0,
+        "amostra_minima": 200,
+    },
+    "0KM": {
+        "verde": 3.0,
+        "amarelo": 5.0,
+        "amostra_minima": 50,
+    },
+    "TDV": {
+        "verde": 8.0,
+        "amarelo": 12.0,
+        "amostra_minima": 30,
+    },
+}
+
+# Fila: tempo necessário para absorção, considerando a produção dos últimos 60 minutos.
+LIMITE_FILA_VERDE_MIN = 15.0
+LIMITE_FILA_AMARELO_MIN = 30.0
+
+# Sucesso: só avalia queda de desempenho quando a fila atual representa
+# pelo menos 15 minutos de processamento no ritmo da última hora.
+LIMITE_DEMANDA_SUCESSO_MIN = 15.0
+
+# Tolerâncias para não alternar setas por pequenas oscilações.
+TOLERANCIA_TENDENCIA_SUCESSO_PCT = 5.0
+TOLERANCIA_TENDENCIA_FILA_MIN = 5.0
+TOLERANCIA_TENDENCIA_INCONS_PP = 0.5
+
+
+# =========================
 # STREAMLIT
 # =========================
 
@@ -2782,6 +2824,442 @@ def cor_saude(valor: int, media, tipo: str):
 
     return "#FFFFFF"
 
+
+
+def preparar_dados_cards(df_base: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepara somente o dia mais recente para os cálculos dos cards.
+
+    Também remove coletas repetidas na coluna Data/Hora. Isso evita que uma
+    única coleta replicada em vários intervalos distorça as janelas móveis.
+    """
+    if df_base is None or df_base.empty:
+        return pd.DataFrame()
+
+    df_cards = df_base.copy()
+
+    if "Data/Hora" in df_cards.columns:
+        df_cards["_momento"] = pd.to_datetime(
+            df_cards["Data/Hora"],
+            dayfirst=True,
+            errors="coerce",
+            format="mixed",
+        )
+    elif "Horário" in df_cards.columns:
+        hoje = agora_sao_paulo().normalize()
+        df_cards["_momento"] = pd.to_datetime(
+            hoje.strftime("%Y-%m-%d")
+            + " "
+            + df_cards["Horário"].astype(str).str.slice(0, 5),
+            errors="coerce",
+        )
+    else:
+        return pd.DataFrame()
+
+    df_cards = df_cards.dropna(subset=["_momento"])
+
+    if df_cards.empty:
+        return df_cards
+
+    data_mais_recente = df_cards["_momento"].max().normalize()
+    df_cards = df_cards[
+        df_cards["_momento"].dt.normalize() == data_mais_recente
+    ].copy()
+
+    return (
+        df_cards
+        .sort_values("_momento")
+        .drop_duplicates(subset=["_momento"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
+def linha_proxima_janela(
+    df_cards: pd.DataFrame,
+    momento_alvo: pd.Timestamp,
+    tolerancia_minutos: int = 20,
+):
+    """Retorna a coleta mais próxima do momento desejado, dentro da tolerância."""
+    if df_cards is None or df_cards.empty:
+        return None
+
+    distancias = (df_cards["_momento"] - momento_alvo).abs()
+    indice = distancias.idxmin()
+
+    if distancias.loc[indice] > pd.Timedelta(minutes=tolerancia_minutos):
+        return None
+
+    return df_cards.loc[indice]
+
+
+def valor_numerico_linha(linha, coluna: str) -> float:
+    if linha is None or coluna not in linha:
+        return 0.0
+
+    valor = pd.to_numeric(linha.get(coluna, 0), errors="coerce")
+    return 0.0 if pd.isna(valor) else float(valor)
+
+
+def minutos_escoamento(fila: float, processados_60min: float):
+    """Calcula quantos minutos a fila representa no ritmo da última hora."""
+    fila = float(fila or 0)
+    processados_60min = float(processados_60min or 0)
+
+    if fila <= 0:
+        return 0.0
+
+    if processados_60min <= 0:
+        return float("inf")
+
+    return (fila / processados_60min) * 60.0
+
+
+def percentual_br(valor, casas=1) -> str:
+    if valor is None or pd.isna(valor):
+        return "-"
+    return f"{float(valor):.{casas}f}".replace(".", ",") + "%"
+
+
+def decimal_br(valor, casas=1) -> str:
+    if valor is None or pd.isna(valor):
+        return "-"
+    return f"{float(valor):.{casas}f}".replace(".", ",")
+
+
+def tendencia_html(simbolo: str, cor: str, texto: str = "") -> str:
+    complemento = f" {texto}" if texto else ""
+    return (
+        f'<span style="color:{cor}; font-weight:800; white-space:nowrap;">'
+        f'{simbolo}{complemento}</span>'
+    )
+
+
+def tendencia_sucesso_html(variacao_pct) -> str:
+    if variacao_pct is None or pd.isna(variacao_pct):
+        return tendencia_html("●", COR_AZUL)
+
+    if variacao_pct > TOLERANCIA_TENDENCIA_SUCESSO_PCT:
+        return tendencia_html("▲", COR_VERDE, percentual_br(abs(variacao_pct)))
+
+    if variacao_pct < -TOLERANCIA_TENDENCIA_SUCESSO_PCT:
+        return tendencia_html("▼", COR_VERMELHO, percentual_br(abs(variacao_pct)))
+
+    return tendencia_html("●", COR_AZUL)
+
+
+def tendencia_inconsistencia_html(taxa_60, taxa_dia) -> str:
+    if taxa_60 is None or taxa_dia is None:
+        return tendencia_html("●", COR_AZUL)
+
+    diferenca_pp = float(taxa_60) - float(taxa_dia)
+
+    if diferenca_pp > TOLERANCIA_TENDENCIA_INCONS_PP:
+        return tendencia_html("▲", COR_VERMELHO)
+
+    if diferenca_pp < -TOLERANCIA_TENDENCIA_INCONS_PP:
+        return tendencia_html("▼", COR_VERDE)
+
+    return tendencia_html("●", COR_AZUL)
+
+
+def tendencia_fila_html(tempo_atual, tempo_anterior) -> str:
+    if tempo_atual is None or tempo_anterior is None:
+        return tendencia_html("●", COR_AZUL)
+
+    infinito_atual = tempo_atual == float("inf")
+    infinito_anterior = tempo_anterior == float("inf")
+
+    if infinito_atual and infinito_anterior:
+        return tendencia_html("●", COR_AZUL)
+
+    if infinito_atual and not infinito_anterior:
+        return tendencia_html("▲", COR_VERMELHO)
+
+    if not infinito_atual and infinito_anterior:
+        return tendencia_html("▼", COR_VERDE)
+
+    diferenca = float(tempo_atual) - float(tempo_anterior)
+
+    if diferenca > TOLERANCIA_TENDENCIA_FILA_MIN:
+        return tendencia_html("▲", COR_VERMELHO)
+
+    if diferenca < -TOLERANCIA_TENDENCIA_FILA_MIN:
+        return tendencia_html("▼", COR_VERDE)
+
+    return tendencia_html("●", COR_AZUL)
+
+
+def calcular_indicadores_servico(
+    df_cards: pd.DataFrame,
+    nome_servico: str,
+    coluna_sucesso: str,
+    coluna_fila: str,
+    coluna_inconsistencia: str,
+) -> dict:
+    """
+    Calcula acumulados, janela móvel atual e janela móvel anterior.
+
+    Janela atual: últimos 60 minutos.
+    Janela anterior: de 120 a 60 minutos atrás.
+    """
+    resultado = {
+        "servico": nome_servico,
+        "sucesso_total": 0,
+        "fila_atual": 0,
+        "inconsistencia_total": 0,
+        "sucesso_60": None,
+        "inconsistencia_60": None,
+        "total_60": 0,
+        "sucesso_60_anterior": None,
+        "variacao_sucesso_pct": None,
+        "taxa_inconsistencia_60": None,
+        "taxa_inconsistencia_dia": None,
+        "escoamento_min": None,
+        "escoamento_anterior_min": None,
+        "cobertura_fila_min": None,
+        "demanda_suficiente": False,
+    }
+
+    if df_cards is None or df_cards.empty:
+        return resultado
+
+    atual = df_cards.iloc[-1]
+    momento_atual = pd.Timestamp(atual["_momento"])
+
+    linha_60 = linha_proxima_janela(
+        df_cards,
+        momento_atual - pd.Timedelta(minutes=60),
+    )
+    linha_120 = linha_proxima_janela(
+        df_cards,
+        momento_atual - pd.Timedelta(minutes=120),
+    )
+
+    sucesso_atual = valor_numerico_linha(atual, coluna_sucesso)
+    fila_atual = valor_numerico_linha(atual, coluna_fila)
+    incons_atual = valor_numerico_linha(atual, coluna_inconsistencia)
+
+    resultado["sucesso_total"] = int(sucesso_atual)
+    resultado["fila_atual"] = int(fila_atual)
+    resultado["inconsistencia_total"] = int(incons_atual)
+
+    total_dia = sucesso_atual + incons_atual
+    if total_dia > 0:
+        resultado["taxa_inconsistencia_dia"] = (
+            incons_atual / total_dia
+        ) * 100.0
+
+    if linha_60 is not None:
+        sucesso_base_60 = valor_numerico_linha(linha_60, coluna_sucesso)
+        incons_base_60 = valor_numerico_linha(linha_60, coluna_inconsistencia)
+
+        # Evita percentual incorreto após eventual reinício dos contadores.
+        if sucesso_atual >= sucesso_base_60 and incons_atual >= incons_base_60:
+            sucesso_60 = sucesso_atual - sucesso_base_60
+            incons_60 = incons_atual - incons_base_60
+            total_60 = sucesso_60 + incons_60
+
+            resultado["sucesso_60"] = int(sucesso_60)
+            resultado["inconsistencia_60"] = int(incons_60)
+            resultado["total_60"] = int(total_60)
+
+            if total_60 > 0:
+                resultado["taxa_inconsistencia_60"] = (
+                    incons_60 / total_60
+                ) * 100.0
+
+            resultado["escoamento_min"] = minutos_escoamento(
+                fila_atual,
+                sucesso_60,
+            )
+            resultado["cobertura_fila_min"] = resultado["escoamento_min"]
+
+    if linha_60 is not None and linha_120 is not None:
+        sucesso_60_base = valor_numerico_linha(linha_60, coluna_sucesso)
+        sucesso_120_base = valor_numerico_linha(linha_120, coluna_sucesso)
+
+        if sucesso_60_base >= sucesso_120_base:
+            sucesso_anterior = sucesso_60_base - sucesso_120_base
+            resultado["sucesso_60_anterior"] = int(sucesso_anterior)
+
+            if sucesso_anterior > 0 and resultado["sucesso_60"] is not None:
+                resultado["variacao_sucesso_pct"] = (
+                    (resultado["sucesso_60"] - sucesso_anterior)
+                    / sucesso_anterior
+                ) * 100.0
+
+            fila_60 = valor_numerico_linha(linha_60, coluna_fila)
+            resultado["escoamento_anterior_min"] = minutos_escoamento(
+                fila_60,
+                sucesso_anterior,
+            )
+
+    cobertura = resultado["cobertura_fila_min"]
+
+    if cobertura == float("inf") and fila_atual > 0:
+        resultado["demanda_suficiente"] = True
+    elif cobertura is not None:
+        resultado["demanda_suficiente"] = (
+            cobertura >= LIMITE_DEMANDA_SUCESSO_MIN
+        )
+
+    return resultado
+
+
+def cor_card_inconsistencia(metricas: dict) -> str:
+    configuracao = LIMITES_INCONSISTENCIA.get(
+        metricas.get("servico"),
+        LIMITES_INCONSISTENCIA["Transferências"],
+    )
+
+    taxa = metricas.get("taxa_inconsistencia_60")
+    amostra = int(metricas.get("total_60") or 0)
+
+    if taxa is None or amostra < configuracao["amostra_minima"]:
+        return COR_AZUL
+
+    if taxa <= configuracao["verde"]:
+        return COR_VERDE
+
+    if taxa <= configuracao["amarelo"]:
+        return COR_AMARELO
+
+    return COR_VERMELHO
+
+
+def cor_card_fila(metricas: dict) -> str:
+    tempo = metricas.get("escoamento_min")
+
+    if tempo is None:
+        return COR_AZUL
+
+    if tempo == float("inf"):
+        return COR_VERMELHO
+
+    if tempo <= LIMITE_FILA_VERDE_MIN:
+        return COR_VERDE
+
+    if tempo <= LIMITE_FILA_AMARELO_MIN:
+        return COR_AMARELO
+
+    return COR_VERMELHO
+
+
+def cor_card_sucesso(metricas: dict) -> str:
+    """
+    A queda de sucesso somente gera alerta quando há fila suficiente.
+
+    Com demanda:
+      verde: aumento, estabilidade ou queda de até 10%;
+      amarelo: queda acima de 10% até 25%;
+      vermelho: queda superior a 25%.
+    """
+    if not metricas.get("demanda_suficiente"):
+        return COR_AZUL
+
+    variacao = metricas.get("variacao_sucesso_pct")
+
+    if variacao is None:
+        return COR_AZUL
+
+    if variacao < -25.0:
+        return COR_VERMELHO
+
+    if variacao < -10.0:
+        return COR_AMARELO
+
+    return COR_VERDE
+
+
+def nota_card_inconsistencia(metricas: dict) -> str:
+    taxa_60 = metricas.get("taxa_inconsistencia_60")
+    taxa_dia = metricas.get("taxa_inconsistencia_dia")
+    amostra = int(metricas.get("total_60") or 0)
+    configuracao = LIMITES_INCONSISTENCIA.get(
+        metricas.get("servico"),
+        LIMITES_INCONSISTENCIA["Transferências"],
+    )
+
+    if taxa_60 is None:
+        linha_1 = (
+            f'<b>Últimos 60 min:</b> sem dados '
+            f'{tendencia_html("●", COR_AZUL)}'
+        )
+    else:
+        linha_1 = (
+            f'<b>Últimos 60 min:</b> {percentual_br(taxa_60, 2)} '
+            f'{tendencia_inconsistencia_html(taxa_60, taxa_dia)}'
+        )
+
+    linha_2 = f'Acumulado do dia: {percentual_br(taxa_dia, 2)}'
+
+    if amostra < configuracao["amostra_minima"]:
+        linha_2 += " • amostra insuficiente"
+
+    return f"{linha_1}<br>{linha_2}"
+
+
+def nota_card_fila(metricas: dict) -> str:
+    tempo = metricas.get("escoamento_min")
+    tempo_anterior = metricas.get("escoamento_anterior_min")
+    seta = tendencia_fila_html(tempo, tempo_anterior)
+
+    if tempo is None:
+        linha_1 = f'<b>Escoamento:</b> sem dados {seta}'
+    elif tempo == float("inf"):
+        linha_1 = f'<b>Escoamento:</b> sem processamento {seta}'
+    elif tempo == 0:
+        linha_1 = f'<b>Escoamento:</b> sem fila {seta}'
+    else:
+        linha_1 = (
+            f'<b>Escoamento estimado:</b> '
+            f'{decimal_br(tempo)} min {seta}'
+        )
+
+    if tempo_anterior is None:
+        sucesso_60 = metricas.get("sucesso_60")
+        linha_2 = (
+            "Processados nos últimos 60 min: "
+            + (fmt_num(sucesso_60) if sucesso_60 is not None else "-")
+        )
+    elif tempo_anterior == float("inf"):
+        linha_2 = "Há 1 hora: sem processamento"
+    elif tempo_anterior == 0:
+        linha_2 = "Há 1 hora: sem fila"
+    else:
+        linha_2 = f"Há 1 hora: {decimal_br(tempo_anterior)} min"
+
+    return f"{linha_1}<br>{linha_2}"
+
+
+def nota_card_sucesso(metricas: dict) -> str:
+    sucesso_60 = metricas.get("sucesso_60")
+    sucesso_anterior = metricas.get("sucesso_60_anterior")
+    variacao = metricas.get("variacao_sucesso_pct")
+
+    if sucesso_60 is None:
+        linha_1 = (
+            f'<b>Últimos 60 min:</b> sem dados '
+            f'{tendencia_html("●", COR_AZUL)}'
+        )
+    else:
+        linha_1 = (
+            f'<b>Últimos 60 min:</b> {fmt_num(sucesso_60)} '
+            f'{tendencia_sucesso_html(variacao)}'
+        )
+
+    if not metricas.get("demanda_suficiente"):
+        linha_2 = (
+            f'Demanda insuficiente para avaliação '
+            f'{tendencia_html("●", COR_AZUL)}'
+        )
+    elif sucesso_anterior is None:
+        linha_2 = "Hora anterior: sem dados suficientes"
+    else:
+        linha_2 = f"Hora anterior: {fmt_num(sucesso_anterior)}"
+
+    return f"{linha_1}<br>{linha_2}"
+
 def cor_criticas_minuto(valor):
     valor = int(valor or 0)
 
@@ -4524,6 +5002,34 @@ fila_tdv = int(ultima.get("Fila TDV", 0))
 sucesso_tdv = int(ultima.get("Sucesso TDV", 0))
 incons_tdv = int(ultima.get("Inconsistencia TDV", 0))
 
+
+# Base temporal utilizada pelos cards dinâmicos.
+df_cards = preparar_dados_cards(df)
+
+metricas_trf = calcular_indicadores_servico(
+    df_cards,
+    "Transferências",
+    "Sucesso 2 e 3",
+    "Fila 2 e 3",
+    "Inconsistência 2 e 3",
+)
+
+metricas_0km = calcular_indicadores_servico(
+    df_cards,
+    "0KM",
+    "Sucesso 0km",
+    "Fila 0km",
+    "Inconsistência 0km",
+)
+
+metricas_tdv = calcular_indicadores_servico(
+    df_cards,
+    "TDV",
+    "Sucesso TDV",
+    "Fila TDV",
+    "Inconsistencia TDV",
+)
+
 tdv_hora = 0
 try:
     if "Horário" in df.columns and "Quantidade de processos - TDV" in df.columns:
@@ -4609,60 +5115,60 @@ if pagina == "Monitoramento atual":
         render_card(
             "Fila Transferências",
             fila_trf,
-            cor_saude(fila_trf, media_coluna(df_media, "Fila 2 e 3", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_fila(metricas_trf),
+            nota_card_fila(metricas_trf),
         )
         render_card(
             "Fila 0KM",
             fila_0km,
-            cor_saude(fila_0km, media_coluna(df_media, "Fila 0km", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_fila(metricas_0km),
+            nota_card_fila(metricas_0km),
         )
         render_card(
             "Fila TDV",
             fila_tdv,
-            "#1A73E8",
-            f"Último registro: {hora_coleta}",
+            cor_card_fila(metricas_tdv),
+            nota_card_fila(metricas_tdv),
         )
 
     with cols[1]:
         render_card(
             "Sucesso Transferências",
             sucesso_trf,
-            cor_saude(sucesso_trf, media_coluna(df_media, "Sucesso 2 e 3", hora_coleta), "positivo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_sucesso(metricas_trf),
+            nota_card_sucesso(metricas_trf),
         )
         render_card(
             "Sucesso 0KM",
             sucesso_0km,
-            cor_saude(sucesso_0km, media_coluna(df_media, "Sucesso 0km", hora_coleta), "positivo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_sucesso(metricas_0km),
+            nota_card_sucesso(metricas_0km),
         )
         render_card(
             "Sucesso TDV",
             sucesso_tdv,
-            "#1A73E8",
-            f"Último registro: {hora_coleta}",
+            cor_card_sucesso(metricas_tdv),
+            nota_card_sucesso(metricas_tdv),
         )
 
     with cols[2]:
         render_card(
             "Inconsistências Transferências",
             incons_trf,
-            cor_saude(incons_trf, media_coluna(df_media, "Inconsistência 2 e 3", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_inconsistencia(metricas_trf),
+            nota_card_inconsistencia(metricas_trf),
         )
         render_card(
             "Inconsistências 0KM",
             incons_0km,
-            cor_saude(incons_0km, media_coluna(df_media, "Inconsistência 0km", hora_coleta), "negativo"),
-            f"Último registro: {hora_coleta}",
+            cor_card_inconsistencia(metricas_0km),
+            nota_card_inconsistencia(metricas_0km),
         )
         render_card(
             "Inconsistências TDV",
             incons_tdv,
-            "#1A73E8",
-            f"Último registro: {hora_coleta}",
+            cor_card_inconsistencia(metricas_tdv),
+            nota_card_inconsistencia(metricas_tdv),
         )
 
     with cols[3]:
