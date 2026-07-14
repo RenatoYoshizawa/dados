@@ -2637,9 +2637,21 @@ def carregar_excel(path_str: str, mtime: float):
     if "Horário" in df.columns:
         df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
 
+    colunas_texto = {
+        "Horário",
+        "Data/Hora",
+        "Data",
+        "Ficha monitorada Fila 2 e 3",
+        "Ficha monitorada Fila 0km",
+        "Ficha monitorada Fila TDV",
+    }
+    
     for col in df.columns:
-        if col not in ("Horário", "Data/Hora", "Data"):
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+        if col not in colunas_texto:
+            df[col] = pd.to_numeric(
+                df[col],
+                errors="coerce",
+            ).fillna(0).astype(int)
 
     return df
 
@@ -2988,7 +3000,87 @@ def tendencia_fila_html(tempo_atual, tempo_anterior) -> str:
 
     return tendencia_html("●", COR_AZUL)
 
+def cor_fila_por_permanencia(
+    fila_atual,
+    permanencia_minutos,
+    coleta_valida,
+):
+    fila_atual = int(
+        pd.to_numeric(
+            fila_atual,
+            errors="coerce",
+        )
+        or 0
+    )
 
+    permanencia = int(
+        pd.to_numeric(
+            permanencia_minutos,
+            errors="coerce",
+        )
+        or 0
+    )
+
+    coleta_valida = int(
+        pd.to_numeric(
+            coleta_valida,
+            errors="coerce",
+        )
+        or 0
+    )
+
+    # Não foi possível confirmar a planilha atual.
+    if coleta_valida != 1:
+        return "#1A73E8"  # azul
+
+    # Não existe fila.
+    if fila_atual <= 0:
+        return "#188038"  # verde
+
+    # Primeira identificação e permanência de 10 minutos.
+    if permanencia < 20:
+        return "#188038"  # verde
+
+    # Encontrada após 20 minutos.
+    if permanencia < 30:
+        return "#F9AB00"  # amarelo
+
+    # Encontrada após 30 minutos ou mais.
+    return "#D93025"  # vermelho
+
+def nota_fila_por_permanencia(
+    ficha,
+    permanencia_minutos,
+    coleta_valida,
+):
+    coleta_valida = int(
+        pd.to_numeric(
+            coleta_valida,
+            errors="coerce",
+        )
+        or 0
+    )
+
+    if coleta_valida != 1:
+        return "Não foi possível confirmar a fila na última coleta."
+
+    ficha = str(ficha or "").strip()
+    permanencia = int(
+        pd.to_numeric(
+            permanencia_minutos,
+            errors="coerce",
+        )
+        or 0
+    )
+
+    if not ficha:
+        return "Fila sem ficha para monitoramento."
+
+    return (
+        f"Ficha monitorada: <b>{html.escape(ficha)}</b><br>"
+        f"Permanência: <b>{permanencia} min</b>"
+    )
+    
 def calcular_indicadores_servico(
     df_cards: pd.DataFrame,
     nome_servico: str,
@@ -5002,6 +5094,70 @@ fila_tdv = int(ultima.get("Fila TDV", 0))
 sucesso_tdv = int(ultima.get("Sucesso TDV", 0))
 incons_tdv = int(ultima.get("Inconsistencia TDV", 0))
 
+ficha_fila_trf = str(
+    ultima.get(
+        "Ficha monitorada Fila 2 e 3",
+        "",
+    )
+).strip()
+
+permanencia_fila_trf = int(
+    ultima.get(
+        "Permanência Fila 2 e 3 (min)",
+        0,
+    )
+)
+
+coleta_valida_fila_trf = int(
+    ultima.get(
+        "Coleta válida Fila 2 e 3",
+        0,
+    )
+)
+
+
+ficha_fila_0km = str(
+    ultima.get(
+        "Ficha monitorada Fila 0km",
+        "",
+    )
+).strip()
+
+permanencia_fila_0km = int(
+    ultima.get(
+        "Permanência Fila 0km (min)",
+        0,
+    )
+)
+
+coleta_valida_fila_0km = int(
+    ultima.get(
+        "Coleta válida Fila 0km",
+        0,
+    )
+)
+
+
+ficha_fila_tdv = str(
+    ultima.get(
+        "Ficha monitorada Fila TDV",
+        "",
+    )
+).strip()
+
+permanencia_fila_tdv = int(
+    ultima.get(
+        "Permanência Fila TDV (min)",
+        0,
+    )
+)
+
+coleta_valida_fila_tdv = int(
+    ultima.get(
+        "Coleta válida Fila TDV",
+        0,
+    )
+)
 
 # Base temporal utilizada pelos cards dinâmicos.
 df_cards = preparar_dados_cards(df)
@@ -5115,20 +5271,46 @@ if pagina == "Monitoramento atual":
         render_card(
             "Fila Transferências",
             fila_trf,
-            cor_card_fila(metricas_trf),
-            nota_card_fila(metricas_trf),
+            cor_fila_por_permanencia(
+                fila_trf,
+                permanencia_fila_trf,
+                coleta_valida_fila_trf,
+            ),
+            nota_fila_por_permanencia(
+                ficha_fila_trf,
+                permanencia_fila_trf,
+                coleta_valida_fila_trf,
+            ),
         )
+    
         render_card(
             "Fila 0KM",
             fila_0km,
-            cor_card_fila(metricas_0km),
-            nota_card_fila(metricas_0km),
+            cor_fila_por_permanencia(
+                fila_0km,
+                permanencia_fila_0km,
+                coleta_valida_fila_0km,
+            ),
+            nota_fila_por_permanencia(
+                ficha_fila_0km,
+                permanencia_fila_0km,
+                coleta_valida_fila_0km,
+            ),
         )
+    
         render_card(
             "Fila TDV",
             fila_tdv,
-            cor_card_fila(metricas_tdv),
-            nota_card_fila(metricas_tdv),
+            cor_fila_por_permanencia(
+                fila_tdv,
+                permanencia_fila_tdv,
+                coleta_valida_fila_tdv,
+            ),
+            nota_fila_por_permanencia(
+                ficha_fila_tdv,
+                permanencia_fila_tdv,
+                coleta_valida_fila_tdv,
+            ),
         )
 
     with cols[1]:
