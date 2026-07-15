@@ -3249,24 +3249,29 @@ def calcular_indicadores_servico(
             coluna_inconsistencia,
         )
     
-        # Evita valores incorretos quando os contadores forem reiniciados.
-        if (
-            sucesso_atual >= sucesso_anterior
-            and incons_atual >= incons_anterior
-        ):
+
+        # Calcula o ciclo quando o contador de sucesso não diminuiu.
+        if sucesso_atual >= sucesso_anterior:
             sucesso_10 = sucesso_atual - sucesso_anterior
-            incons_10 = incons_atual - incons_anterior
+        
+            # Se o acumulado de inconsistências diminuiu,
+            # considera que não houve nova inconsistência no ciclo.
+            incons_10 = max(
+                0,
+                incons_atual - incons_anterior,
+            )
+        
             total_10 = sucesso_10 + incons_10
-    
+        
             resultado["sucesso_10"] = int(sucesso_10)
             resultado["inconsistencia_10"] = int(incons_10)
             resultado["total_10"] = int(total_10)
-    
+        
             if total_10 > 0:
                 resultado["taxa_inconsistencia_10"] = (
                     incons_10 / total_10
                 ) * 100.0
-        
+                
     if linha_60 is not None:
         sucesso_base_60 = valor_numerico_linha(linha_60, coluna_sucesso)
         incons_base_60 = valor_numerico_linha(linha_60, coluna_inconsistencia)
