@@ -126,22 +126,23 @@ COR_AMARELO = "#F9AB00"
 COR_VERMELHO = "#D93025"
 COR_AZUL = "#1A73E8"
 
-# Taxas máximas de inconsistência nos últimos 60 minutos.
+
+# Limites da taxa de inconsistência no último ciclo de 10 minutos.
 LIMITES_INCONSISTENCIA = {
     "Transferências": {
-        "verde": 12.0,
-        "amarelo": 14.0,
-        "amostra_minima": 200,
-    },
-    "0KM": {
-        "verde": 3.0,
-        "amarelo": 5.0,
+        "verde": 14.0,
+        "amarelo": 16.0,
         "amostra_minima": 50,
     },
+    "0KM": {
+        "verde": 5.0,
+        "amarelo": 7.0,
+        "amostra_minima": 10,
+    },
     "TDV": {
-        "verde": 8.0,
-        "amarelo": 12.0,
-        "amostra_minima": 30,
+        "verde": 10.0,
+        "amarelo": 14.0,
+        "amostra_minima": 5,
     },
 }
 
@@ -3197,6 +3198,11 @@ def calcular_indicadores_servico(
         "escoamento_anterior_min": None,
         "cobertura_fila_min": None,
         "demanda_suficiente": False,
+
+        "sucesso_10": None,
+        "inconsistencia_10": None,
+        "total_10": 0,
+        "taxa_inconsistencia_10": None,
     }
 
     if df_cards is None or df_cards.empty:
@@ -3228,6 +3234,39 @@ def calcular_indicadores_servico(
             incons_atual / total_dia
         ) * 100.0
 
+    # Taxa de inconsistência do último ciclo de 10 minutos.
+    # Usa a diferença entre a coleta atual e a coleta anterior.
+    if len(df_cards) >= 2:
+        anterior = df_cards.iloc[-2]
+    
+        sucesso_anterior = valor_numerico_linha(
+            anterior,
+            coluna_sucesso,
+        )
+    
+        incons_anterior = valor_numerico_linha(
+            anterior,
+            coluna_inconsistencia,
+        )
+    
+        # Evita valores incorretos quando os contadores forem reiniciados.
+        if (
+            sucesso_atual >= sucesso_anterior
+            and incons_atual >= incons_anterior
+        ):
+            sucesso_10 = sucesso_atual - sucesso_anterior
+            incons_10 = incons_atual - incons_anterior
+            total_10 = sucesso_10 + incons_10
+    
+            resultado["sucesso_10"] = int(sucesso_10)
+            resultado["inconsistencia_10"] = int(incons_10)
+            resultado["total_10"] = int(total_10)
+    
+            if total_10 > 0:
+                resultado["taxa_inconsistencia_10"] = (
+                    incons_10 / total_10
+                ) * 100.0
+        
     if linha_60 is not None:
         sucesso_base_60 = valor_numerico_linha(linha_60, coluna_sucesso)
         incons_base_60 = valor_numerico_linha(linha_60, coluna_inconsistencia)
@@ -3291,10 +3330,15 @@ def cor_card_inconsistencia(metricas: dict) -> str:
         LIMITES_INCONSISTENCIA["Transferências"],
     )
 
-    taxa = metricas.get("taxa_inconsistencia_60")
-    amostra = int(metricas.get("total_60") or 0)
+    # Mapa de calor baseado no último ciclo de 10 minutos.
+    taxa = metricas.get("taxa_inconsistencia_10")
+    amostra = int(metricas.get("total_10") or 0)
 
-    if taxa is None or amostra < configuracao["amostra_minima"]:
+    # Sem dados ou abaixo da amostra mínima: azul.
+    if (
+        taxa is None
+        or amostra < configuracao["amostra_minima"]
+    ):
         return COR_AZUL
 
     if taxa <= configuracao["verde"]:
@@ -3460,26 +3504,43 @@ def nota_card_sucesso_ciclo(
 
 
 def nota_card_inconsistencia(metricas: dict) -> str:
-    taxa_60 = metricas.get("taxa_inconsistencia_60")
-    taxa_dia = metricas.get("taxa_inconsistencia_dia")
-    amostra = int(metricas.get("total_60") or 0)
+    taxa_10 = metricas.get(
+        "taxa_inconsistencia_10"
+    )
+
+    taxa_dia = metricas.get(
+        "taxa_inconsistencia_dia"
+    )
+
+    amostra = int(
+        metricas.get("total_10")
+        or 0
+    )
+
     configuracao = LIMITES_INCONSISTENCIA.get(
         metricas.get("servico"),
         LIMITES_INCONSISTENCIA["Transferências"],
     )
 
-    if taxa_60 is None:
+    if taxa_10 is None:
         linha_1 = (
-            f'<b>Últimos 60 min:</b> sem dados '
+            f'<b>Últimos 10 min:</b> sem dados '
             f'{tendencia_html("●", COR_AZUL)}'
         )
     else:
         linha_1 = (
-            f'<b>Últimos 60 min:</b> {percentual_br(taxa_60, 2)} '
-            f'{tendencia_inconsistencia_html(taxa_60, taxa_dia)}'
+            f'<b>Últimos 10 min:</b> '
+            f'{percentual_br(taxa_10, 2)} '
+            f'{tendencia_inconsistencia_html(
+                taxa_10,
+                taxa_dia,
+            )}'
         )
 
-    linha_2 = f'Acumulado do dia: {percentual_br(taxa_dia, 2)}'
+    linha_2 = (
+        f'Acumulado do dia: '
+        f'{percentual_br(taxa_dia, 2)}'
+    )
 
     if amostra < configuracao["amostra_minima"]:
         linha_2 += " • amostra insuficiente"
