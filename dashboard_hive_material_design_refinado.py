@@ -5470,69 +5470,69 @@ if pagina == "Monitoramento atual":
             ),
         )
 
-with cols[1]:
-    render_card(
-        "Sucesso Transferências",
-
-        # Número grande: acumulado do dia
-        sucesso_trf,
-
-        # Cor: produção do último ciclo de 10 minutos
-        cor_card_sucesso_ciclo(
-            fila_atual=fila_trf,
-            sucesso_ciclo=sucesso_ciclo_trf,
-            limite_fila=250,
-            limite_verde=250,
-            limite_amarelo=200,
-            ciclo_valido=ciclo_sucesso_valido,
-        ),
-
-        nota_card_sucesso_ciclo(
-            sucesso_ciclo_trf,
-        ),
-    )
-
-    render_card(
-        "Sucesso 0KM",
-
-        # Número grande: acumulado do dia
-        sucesso_0km,
-
-        # Cor: produção do último ciclo de 10 minutos
-        cor_card_sucesso_ciclo(
-            fila_atual=fila_0km,
-            sucesso_ciclo=sucesso_ciclo_0km,
-            limite_fila=70,
-            limite_verde=100,
-            limite_amarelo=50,
-            ciclo_valido=ciclo_sucesso_valido,
-        ),
-
-        nota_card_sucesso_ciclo(
-            sucesso_ciclo_0km,
-        ),
-    )
-
-    render_card(
-        "Sucesso TDV",
-
-        # Número grande: acumulado do dia
-        sucesso_tdv,
-
-        # Cor: produção do último ciclo de 10 minutos
-        cor_card_sucesso_ciclo(
-            fila_atual=fila_tdv,
-            sucesso_ciclo=sucesso_ciclo_tdv,
-            limite_fila=15,
-            limite_verde=15,
-            limite_amarelo=10,
-            ciclo_valido=ciclo_sucesso_valido,
-        ),
-
-        nota_card_sucesso_ciclo(
-            sucesso_ciclo_tdv,
-        ),
-    )
+    with cols[1]:
+        render_card(
+            "Sucesso Transferências",
+    
+            # Número grande: acumulado do dia
+            sucesso_trf,
+    
+            # Cor: produção do último ciclo de 10 minutos
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_trf,
+                sucesso_ciclo=sucesso_ciclo_trf,
+                limite_fila=250,
+                limite_verde=250,
+                limite_amarelo=200,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+    
+            nota_card_sucesso_ciclo(
+                sucesso_ciclo_trf,
+            ),
+        )
+    
+        render_card(
+            "Sucesso 0KM",
+    
+            # Número grande: acumulado do dia
+            sucesso_0km,
+    
+            # Cor: produção do último ciclo de 10 minutos
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_0km,
+                sucesso_ciclo=sucesso_ciclo_0km,
+                limite_fila=70,
+                limite_verde=100,
+                limite_amarelo=50,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+    
+            nota_card_sucesso_ciclo(
+                sucesso_ciclo_0km,
+            ),
+        )
+    
+        render_card(
+            "Sucesso TDV",
+    
+            # Número grande: acumulado do dia
+            sucesso_tdv,
+    
+            # Cor: produção do último ciclo de 10 minutos
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_tdv,
+                sucesso_ciclo=sucesso_ciclo_tdv,
+                limite_fila=15,
+                limite_verde=15,
+                limite_amarelo=10,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+    
+            nota_card_sucesso_ciclo(
+                sucesso_ciclo_tdv,
+            ),
+        )
 
     with cols[2]:
         render_card(
