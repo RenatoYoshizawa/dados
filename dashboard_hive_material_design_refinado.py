@@ -2706,6 +2706,11 @@ def carregar_csv_historico(path_str: str, mtime: float):
         "STOP PROCESSO ativado?",
         "Serviços desligados",
         "Falhas ao desligar",
+    
+        # Fichas devem permanecer como texto
+        "Ficha monitorada Fila 2 e 3",
+        "Ficha monitorada Fila 0km",
+        "Ficha monitorada Fila TDV",
     }
 
     for col in df.columns:
@@ -2716,36 +2721,79 @@ def carregar_csv_historico(path_str: str, mtime: float):
 
     return df
 
-def agrupar_monitoramento_por_horario(df_base: pd.DataFrame) -> pd.DataFrame:
-    if df_base is None or df_base.empty or "Horário" not in df_base.columns:
+def agrupar_monitoramento_por_horario(
+    df_base: pd.DataFrame
+) -> pd.DataFrame:
+
+    if (
+        df_base is None
+        or df_base.empty
+        or "Horário" not in df_base.columns
+    ):
         return df_base
 
     df_aux = df_base.copy()
-    df_aux["Horário"] = df_aux["Horário"].astype(str).str.slice(0, 5)
 
-    colunas_numericas = [
-        c for c in df_aux.columns
-        if c not in ("Data/Hora", "Data", "Horário")
-        and pd.api.types.is_numeric_dtype(pd.to_numeric(df_aux[c], errors="coerce"))
-    ]
+    df_aux["Horário"] = (
+        df_aux["Horário"]
+        .astype(str)
+        .str.slice(0, 5)
+    )
 
-    if not colunas_numericas:
-        return df_aux.sort_values("Horário").reset_index(drop=True)
+    colunas_ficha = {
+        "Ficha monitorada Fila 2 e 3",
+        "Ficha monitorada Fila 0km",
+        "Ficha monitorada Fila TDV",
+    }
 
-    agg = {c: "max" for c in colunas_numericas}
-    if "Data/Hora" in df_aux.columns:
-        agg["Data/Hora"] = "last"
-    if "Data" in df_aux.columns:
-        agg["Data"] = "last"
+    agregacoes = {}
+
+    for coluna in df_aux.columns:
+
+        if coluna == "Horário":
+            continue
+
+        # Datas são mantidas usando o último registro.
+        if coluna in {
+            "Data/Hora",
+            "Data",
+        }:
+            agregacoes[coluna] = "last"
+            continue
+
+        # Números das fichas precisam continuar como texto.
+        if coluna in colunas_ficha:
+            df_aux[coluna] = (
+                df_aux[coluna]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+            )
+
+            agregacoes[coluna] = "last"
+            continue
+
+        # Demais colunas são numéricas.
+        df_aux[coluna] = (
+            pd.to_numeric(
+                df_aux[coluna],
+                errors="coerce",
+            )
+            .fillna(0)
+        )
+
+        agregacoes[coluna] = "max"
 
     return (
         df_aux
-        .groupby("Horário", as_index=False)
-        .agg(agg)
+        .groupby(
+            "Horário",
+            as_index=False,
+        )
+        .agg(agregacoes)
         .sort_values("Horário")
         .reset_index(drop=True)
     )
-
 
 def media_coluna(df_media: pd.DataFrame, coluna: str, horario: str = None):
     """
@@ -3048,37 +3096,76 @@ def cor_fila_por_permanencia(
     # Encontrada após 30 minutos ou mais.
     return "#D93025"  # vermelho
 
+def texto_faixa_permanencia(
+    permanencia_minutos
+) -> str:
+
+    permanencia = pd.to_numeric(
+        permanencia_minutos,
+        errors="coerce",
+    )
+
+    if pd.isna(permanencia):
+        permanencia = 0
+
+    permanencia = max(
+        0,
+        int(permanencia),
+    )
+
+    if permanencia < 10:
+        return "0 - 9 min"
+
+    if permanencia < 20:
+        return "10 - 19 min"
+
+    if permanencia < 30:
+        return "20 - 29 min"
+
+    return "30 min ou mais"
+
+
 def nota_fila_por_permanencia(
     ficha,
     permanencia_minutos,
     coleta_valida,
 ):
-    coleta_valida = int(
-        pd.to_numeric(
-            coleta_valida,
-            errors="coerce",
-        )
-        or 0
+    coleta_valida = pd.to_numeric(
+        coleta_valida,
+        errors="coerce",
     )
 
-    if coleta_valida != 1:
-        return "Não foi possível confirmar a fila na última coleta."
+    if pd.isna(coleta_valida):
+        coleta_valida = 0
 
-    ficha = str(ficha or "").strip()
-    permanencia = int(
-        pd.to_numeric(
-            permanencia_minutos,
-            errors="coerce",
+    if int(coleta_valida) != 1:
+        return (
+            "Não foi possível confirmar a fila "
+            "na última coleta."
         )
-        or 0
-    )
 
-    if not ficha:
+    ficha = str(
+        ficha or ""
+    ).strip()
+
+    if ficha.lower() in {
+        "",
+        "0",
+        "0.0",
+        "nan",
+        "none",
+    }:
         return "Fila sem ficha para monitoramento."
 
+    faixa_permanencia = texto_faixa_permanencia(
+        permanencia_minutos
+    )
+
     return (
-        f"Ficha monitorada: <b>{html.escape(ficha)}</b><br>"
-        f"Permanência: <b>{permanencia} min</b>"
+        f"Ficha monitorada (última): "
+        f"<b>{html.escape(ficha)}</b><br>"
+        f"Permanência: "
+        f"<b>{faixa_permanencia}</b>"
     )
     
 def calcular_indicadores_servico(
@@ -5032,22 +5119,15 @@ try:
         obrigatorio=True,
     )
 
-    df = pd.read_excel(caminho_monitor, engine="openpyxl")
-    df = normalizar_colunas(df)
-
-    if "Horário" in df.columns:
-        df["Horário"] = df["Horário"].astype(str).str.slice(0, 5)
-
-    for col in df.columns:
-        if col not in ("Horário", "Data/Hora", "Data"):
-            df[col] = (
-                pd.to_numeric(df[col], errors="coerce")
-                .fillna(0)
-                .astype(int)
-            )
+    df = carregar_excel(
+        str(caminho_monitor),
+        Path(caminho_monitor).stat().st_mtime,
+    )
 
 except Exception as e:
-    st.error(f"Erro ao carregar o arquivo Monitoramento.xlsx do GitHub: {e}")
+    st.error(
+        f"Erro ao carregar o arquivo Monitoramento.xlsx do GitHub: {e}"
+    )
     st.stop()
 
 if df.empty:
