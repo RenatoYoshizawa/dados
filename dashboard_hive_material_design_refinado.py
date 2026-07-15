@@ -3349,42 +3349,59 @@ def cor_card_sucesso(metricas: dict) -> str:
 
     return COR_VERDE
 
-def cor_card_sucesso_transferencias(metricas: dict) -> str:
+def cor_card_sucesso_ciclo(
+    fila_atual,
+    sucesso_ciclo,
+    limite_fila,
+    limite_verde,
+    limite_amarelo,
+    ciclo_valido=True,
+) -> str:
     """
-    Cor do card de Sucesso Transferências.
+    Define a cor com base na produção do último ciclo de 10 minutos.
+    """
 
-    Regra:
-    - fila menor que 250: verde;
-    - fila igual ou maior que 250:
-        - sucesso nos últimos 60 min >= 250: verde;
-        - sucesso nos últimos 60 min entre 200 e 249: amarelo;
-        - sucesso nos últimos 60 min < 200: vermelho.
-    """
+    if not ciclo_valido:
+        return COR_AZUL
+
     fila_atual = int(
-        metricas.get("fila_atual")
+        pd.to_numeric(
+            fila_atual,
+            errors="coerce",
+        )
         or 0
     )
 
-    sucesso_60 = metricas.get("sucesso_60")
+    sucesso_ciclo = int(
+        pd.to_numeric(
+            sucesso_ciclo,
+            errors="coerce",
+        )
+        or 0
+    )
 
-    # Com fila abaixo de 250, não cobra produtividade mínima.
-    if fila_atual < 250:
+    # Abaixo da fila mínima, mantém o card verde.
+    if fila_atual < limite_fila:
         return COR_VERDE
 
-    # Há fila suficiente, mas ainda não existem dados completos
-    # dos últimos 60 minutos.
-    if sucesso_60 is None:
-        return COR_AZUL
-
-    sucesso_60 = int(sucesso_60)
-
-    if sucesso_60 >= 250:
+    if sucesso_ciclo >= limite_verde:
         return COR_VERDE
 
-    if sucesso_60 >= 200:
+    if sucesso_ciclo >= limite_amarelo:
         return COR_AMARELO
 
     return COR_VERMELHO
+
+
+def nota_card_sucesso_ciclo(
+    acumulado_dia,
+    hora_coleta,
+) -> str:
+    return (
+        f"Resultado do último ciclo de 10 min<br>"
+        f"Acumulado do dia: <b>{fmt_num(acumulado_dia)}</b><br>"
+        f"Coleta: {html.escape(str(hora_coleta))}"
+    )
 
 
 def nota_card_inconsistencia(metricas: dict) -> str:
@@ -5211,6 +5228,31 @@ fila_tdv = int(ultima.get("Fila TDV", 0))
 sucesso_tdv = int(ultima.get("Sucesso TDV", 0))
 incons_tdv = int(ultima.get("Inconsistencia TDV", 0))
 
+# Quantidade processada somente no último ciclo de 10 minutos
+sucesso_ciclo_trf = int(
+    ultima.get(
+        "Quantidade de processos - Transferências",
+        0,
+    )
+)
+
+sucesso_ciclo_0km = int(
+    ultima.get(
+        "Quantidade de processos - 0KM",
+        0,
+    )
+)
+
+sucesso_ciclo_tdv = int(
+    ultima.get(
+        "Quantidade de processos - TDV",
+        0,
+    )
+)
+
+# Na primeira linha do dia não há coleta anterior para comparação.
+ciclo_sucesso_valido = len(df) >= 2
+
 ficha_fila_trf = str(
     ultima.get(
         "Ficha monitorada Fila 2 e 3",
@@ -5433,21 +5475,53 @@ if pagina == "Monitoramento atual":
     with cols[1]:
         render_card(
             "Sucesso Transferências",
-            sucesso_trf,
-            cor_card_sucesso_transferencias(metricas_trf),
-            nota_card_sucesso(metricas_trf),
+            sucesso_ciclo_trf,
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_trf,
+                sucesso_ciclo=sucesso_ciclo_trf,
+                limite_fila=250,
+                limite_verde=250,
+                limite_amarelo=200,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+            nota_card_sucesso_ciclo(
+                sucesso_trf,
+                hora_coleta,
+            ),
         )
+    
         render_card(
             "Sucesso 0KM",
-            sucesso_0km,
-            cor_card_sucesso(metricas_0km),
-            nota_card_sucesso(metricas_0km),
+            sucesso_ciclo_0km,
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_0km,
+                sucesso_ciclo=sucesso_ciclo_0km,
+                limite_fila=70,
+                limite_verde=100,
+                limite_amarelo=50,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+            nota_card_sucesso_ciclo(
+                sucesso_0km,
+                hora_coleta,
+            ),
         )
+    
         render_card(
             "Sucesso TDV",
-            sucesso_tdv,
-            cor_card_sucesso(metricas_tdv),
-            nota_card_sucesso(metricas_tdv),
+            sucesso_ciclo_tdv,
+            cor_card_sucesso_ciclo(
+                fila_atual=fila_tdv,
+                sucesso_ciclo=sucesso_ciclo_tdv,
+                limite_fila=15,
+                limite_verde=15,
+                limite_amarelo=10,
+                ciclo_valido=ciclo_sucesso_valido,
+            ),
+            nota_card_sucesso_ciclo(
+                sucesso_tdv,
+                hora_coleta,
+            ),
         )
 
     with cols[2]:
