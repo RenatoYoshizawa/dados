@@ -3399,8 +3399,7 @@ def nota_card_sucesso_ciclo(
 ) -> str:
     return (
         f"Resultado do último ciclo de 10 min<br>"
-        f"Acumulado do dia: <b>{fmt_num(acumulado_dia)}</b><br>"
-        f"Coleta: {html.escape(str(hora_coleta))}"
+        f"Acumulado do dia: <b>{fmt_num(acumulado_dia)}</b>"
     )
 
 
