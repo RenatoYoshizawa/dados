@@ -3393,13 +3393,70 @@ def cor_card_sucesso_ciclo(
     return COR_VERMELHO
 
 
+def tendencia_sucesso_ciclo_html(
+    sucesso_atual,
+    sucesso_anterior,
+) -> str:
+
+    if sucesso_anterior is None:
+        return tendencia_html("●", COR_AZUL)
+
+    sucesso_atual = int(sucesso_atual or 0)
+    sucesso_anterior = int(sucesso_anterior or 0)
+
+    if sucesso_anterior <= 0:
+        if sucesso_atual > 0:
+            return tendencia_html("↑", COR_VERDE)
+
+        return tendencia_html("●", COR_AZUL)
+
+    variacao_pct = (
+        (sucesso_atual - sucesso_anterior)
+        / sucesso_anterior
+    ) * 100.0
+
+    if variacao_pct > TOLERANCIA_TENDENCIA_SUCESSO_PCT:
+        return tendencia_html("↑", COR_VERDE)
+
+    if variacao_pct < -TOLERANCIA_TENDENCIA_SUCESSO_PCT:
+        return tendencia_html("↓", COR_VERMELHO)
+
+    return tendencia_html("●", COR_AZUL)
+
+
 def nota_card_sucesso_ciclo(
     sucesso_ciclo,
+    sucesso_ciclo_anterior,
+    ciclo_valido=True,
 ) -> str:
-    return (
-        f"Mapa de calor baseado no último ciclo de 10 min<br>"
-        f"Resultado do ciclo: <b>{fmt_num(sucesso_ciclo)}</b>"
+
+    if not ciclo_valido:
+        return (
+            f'<b>Últimos 10 min:</b> sem dados '
+            f'{tendencia_html("●", COR_AZUL)}<br>'
+            f'Ciclo anterior: sem dados suficientes'
+        )
+
+    linha_atual = (
+        f'<b>Últimos 10 min:</b> '
+        f'{fmt_num(sucesso_ciclo)} '
+        f'{tendencia_sucesso_ciclo_html(
+            sucesso_ciclo,
+            sucesso_ciclo_anterior,
+        )}'
     )
+
+    if sucesso_ciclo_anterior is None:
+        linha_anterior = (
+            "Ciclo anterior: sem dados suficientes"
+        )
+    else:
+        linha_anterior = (
+            f"Ciclo anterior: "
+            f"{fmt_num(sucesso_ciclo_anterior)}"
+        )
+
+    return f"{linha_atual}<br>{linha_anterior}"
 
 
 def nota_card_inconsistencia(metricas: dict) -> str:
@@ -5251,6 +5308,37 @@ sucesso_ciclo_tdv = int(
 # Na primeira linha do dia não há coleta anterior para comparação.
 ciclo_sucesso_valido = len(df) >= 2
 
+# O ciclo anterior somente é válido quando existem pelo menos
+# três linhas: primeira coleta, primeiro ciclo e ciclo atual.
+if len(df) >= 3:
+    linha_ciclo_anterior = df.iloc[-2]
+
+    sucesso_ciclo_anterior_trf = int(
+        linha_ciclo_anterior.get(
+            "Quantidade de processos - Transferências",
+            0,
+        )
+    )
+
+    sucesso_ciclo_anterior_0km = int(
+        linha_ciclo_anterior.get(
+            "Quantidade de processos - 0KM",
+            0,
+        )
+    )
+
+    sucesso_ciclo_anterior_tdv = int(
+        linha_ciclo_anterior.get(
+            "Quantidade de processos - TDV",
+            0,
+        )
+    )
+
+else:
+    sucesso_ciclo_anterior_trf = None
+    sucesso_ciclo_anterior_0km = None
+    sucesso_ciclo_anterior_tdv = None
+
 ficha_fila_trf = str(
     ultima.get(
         "Ficha monitorada Fila 2 e 3",
@@ -5477,7 +5565,7 @@ if pagina == "Monitoramento atual":
             # Número grande: acumulado do dia
             sucesso_trf,
     
-            # Cor: produção do último ciclo de 10 minutos
+            # Mapa de calor: último ciclo de 10 minutos
             cor_card_sucesso_ciclo(
                 fila_atual=fila_trf,
                 sucesso_ciclo=sucesso_ciclo_trf,
@@ -5489,6 +5577,8 @@ if pagina == "Monitoramento atual":
     
             nota_card_sucesso_ciclo(
                 sucesso_ciclo_trf,
+                sucesso_ciclo_anterior_trf,
+                ciclo_sucesso_valido,
             ),
         )
     
@@ -5498,7 +5588,7 @@ if pagina == "Monitoramento atual":
             # Número grande: acumulado do dia
             sucesso_0km,
     
-            # Cor: produção do último ciclo de 10 minutos
+            # Mapa de calor: último ciclo de 10 minutos
             cor_card_sucesso_ciclo(
                 fila_atual=fila_0km,
                 sucesso_ciclo=sucesso_ciclo_0km,
@@ -5510,6 +5600,8 @@ if pagina == "Monitoramento atual":
     
             nota_card_sucesso_ciclo(
                 sucesso_ciclo_0km,
+                sucesso_ciclo_anterior_0km,
+                ciclo_sucesso_valido,
             ),
         )
     
@@ -5519,7 +5611,7 @@ if pagina == "Monitoramento atual":
             # Número grande: acumulado do dia
             sucesso_tdv,
     
-            # Cor: produção do último ciclo de 10 minutos
+            # Mapa de calor: último ciclo de 10 minutos
             cor_card_sucesso_ciclo(
                 fila_atual=fila_tdv,
                 sucesso_ciclo=sucesso_ciclo_tdv,
@@ -5531,6 +5623,8 @@ if pagina == "Monitoramento atual":
     
             nota_card_sucesso_ciclo(
                 sucesso_ciclo_tdv,
+                sucesso_ciclo_anterior_tdv,
+                ciclo_sucesso_valido,
             ),
         )
 
