@@ -3330,15 +3330,21 @@ def cor_card_inconsistencia(metricas: dict) -> str:
         LIMITES_INCONSISTENCIA["Transferências"],
     )
 
-    # Mapa de calor baseado no último ciclo de 10 minutos.
     taxa = metricas.get("taxa_inconsistencia_10")
+    inconsistencia_10 = metricas.get("inconsistencia_10")
     amostra = int(metricas.get("total_10") or 0)
 
-    # Sem dados ou abaixo da amostra mínima: azul.
-    if (
-        taxa is None
-        or amostra < configuracao["amostra_minima"]
-    ):
+    # O ciclo foi calculado e não houve nenhuma inconsistência.
+    # Mesmo sem movimentação ou abaixo da amostra mínima, fica verde.
+    if inconsistencia_10 is not None and int(inconsistencia_10) == 0:
+        return COR_VERDE
+
+    # Não foi possível calcular o ciclo anterior.
+    if taxa is None:
+        return COR_AZUL
+
+    # Houve inconsistência, mas a amostra do ciclo foi insuficiente.
+    if amostra < configuracao["amostra_minima"]:
         return COR_AZUL
 
     if taxa <= configuracao["verde"]:
@@ -3504,24 +3510,35 @@ def nota_card_sucesso_ciclo(
 
 
 def nota_card_inconsistencia(metricas: dict) -> str:
-    taxa_10 = metricas.get(
-        "taxa_inconsistencia_10"
-    )
-
-    taxa_dia = metricas.get(
-        "taxa_inconsistencia_dia"
-    )
-
-    amostra = int(
-        metricas.get("total_10")
-        or 0
-    )
+    taxa_10 = metricas.get("taxa_inconsistencia_10")
+    taxa_dia = metricas.get("taxa_inconsistencia_dia")
+    inconsistencia_10 = metricas.get("inconsistencia_10")
+    amostra = int(metricas.get("total_10") or 0)
 
     configuracao = LIMITES_INCONSISTENCIA.get(
         metricas.get("servico"),
         LIMITES_INCONSISTENCIA["Transferências"],
     )
 
+    # Ciclo válido sem nenhuma inconsistência.
+    if (
+        inconsistencia_10 is not None
+        and int(inconsistencia_10) == 0
+    ):
+        linha_1 = (
+            "<b>Últimos 10 min:</b> "
+            "Sem inconsistências"
+        )
+
+        linha_2 = (
+            f"Acumulado do dia: "
+            f"{percentual_br(taxa_dia, 2)} "
+            f'{tendencia_html("●", COR_VERDE)}'
+        )
+
+        return f"{linha_1}<br>{linha_2}"
+
+    # Não existe uma coleta anterior válida para comparação.
     if taxa_10 is None:
         linha_1 = (
             f'<b>Últimos 10 min:</b> sem dados '
@@ -3531,15 +3548,12 @@ def nota_card_inconsistencia(metricas: dict) -> str:
         linha_1 = (
             f'<b>Últimos 10 min:</b> '
             f'{percentual_br(taxa_10, 2)} '
-            f'{tendencia_inconsistencia_html(
-                taxa_10,
-                taxa_dia,
-            )}'
+            f'{tendencia_inconsistencia_html(taxa_10, taxa_dia)}'
         )
 
     linha_2 = (
-        f'Acumulado do dia: '
-        f'{percentual_br(taxa_dia, 2)}'
+        f"Acumulado do dia: "
+        f"{percentual_br(taxa_dia, 2)}"
     )
 
     if amostra < configuracao["amostra_minima"]:
