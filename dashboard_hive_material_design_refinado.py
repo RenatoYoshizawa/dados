@@ -5727,25 +5727,13 @@ if pagina == "Monitoramento atual":
             nota_card_inconsistencia(metricas_tdv),
         )
 
-    with cols[3]:
-        render_card(
-            "Automatizado e-CRV",
-            automatizado,
-            cor_saude(automatizado, media_coluna(df_media, "Automatizado", hora_coleta), "positivo"),
-            f"Último registro: {hora_coleta}",
-        )
-        render_card(
-            "Total",
-            total_sucesso,
-            "#1A73E8",
-            "Soma das Transferências, 0KM e TDV"
-        )
-        render_card(
-            "TDV (Hora)",
-            tdv_hora,
-            "#1A73E8",
-            "Emissões TDV na hora atual",
-        )
+with cols[3]:
+    render_card(
+        "Automatizado e-CRV",
+        automatizado,
+        COR_AZUL,
+        "Processos 100% automatizados",
+    )
 
     with cols[4]:
         render_card(
