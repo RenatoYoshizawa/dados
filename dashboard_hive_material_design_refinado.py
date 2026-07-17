@@ -3114,17 +3114,16 @@ def texto_faixa_permanencia(
         int(permanencia),
     )
 
-    if permanencia < 10:
-        return "0 - 9 min"
+    inicio_faixa = (
+        permanencia // 10
+    ) * 10
 
-    if permanencia < 20:
-        return "10 - 19 min"
+    fim_faixa = inicio_faixa + 9
 
-    if permanencia < 30:
-        return "20 - 29 min"
-
-    return "30 min ou mais"
-
+    return (
+        f"{inicio_faixa} - "
+        f"{fim_faixa} min"
+    )
 
 def nota_fila_por_permanencia(
     ficha,
