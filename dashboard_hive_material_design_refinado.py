@@ -5727,13 +5727,13 @@ if pagina == "Monitoramento atual":
             nota_card_inconsistencia(metricas_tdv),
         )
 
-with cols[3]:
-    render_card(
-        "Automatizado e-CRV",
-        automatizado,
-        COR_AZUL,
-        "Processos 100% automatizados",
-    )
+    with cols[3]:
+        render_card(
+            "Automatizado e-CRV",
+            automatizado,
+            COR_AZUL,
+            "Processos 100% automatizados",
+        )
 
     with cols[4]:
         render_card(
