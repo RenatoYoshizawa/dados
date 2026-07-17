@@ -5734,6 +5734,20 @@ if pagina == "Monitoramento atual":
             COR_AZUL,
             "Processos 100% automatizados",
         )
+    
+        render_card(
+            "Total",
+            total_sucesso,
+            COR_AZUL,
+            "Soma das Transferências, 0KM e TDV",
+        )
+    
+        render_card(
+            "TDV (Hora)",
+            tdv_hora,
+            COR_AZUL,
+            "Emissões TDV na hora atual",
+        )
 
     with cols[4]:
         render_card(
