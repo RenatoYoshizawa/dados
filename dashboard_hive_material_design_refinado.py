@@ -2183,18 +2183,24 @@ def render_controle_robos(
                     key=f"ecrv_{servico}",
                 )
 
-        st.markdown("---")
-        col_aplicar, col_religamento = st.columns([1, 1])
-        with col_aplicar:
-            aplicar = st.form_submit_button("Aplicar", type="primary", use_container_width=True)
-
-        with col_religamento:
+            # Ocupa a quarta posição da coluna e-CRV, anteriormente utilizada
+            # pelo botão "Monitoramento e-CRV".
             religar_auto_15_min = toggle_fn(
-                "Religar Transferência 2, Transferência 3 e 0KM após 15 minutos",
+                "Religar automaticamente após 15 minutos",
                 key="ecrv_religar_auto_15_min",
+                help=(
+                    "Religa Transferência 2, Transferência 3 e 0KM uma única vez "
+                    "após 15 minutos e desativa esta opção automaticamente."
+                ),
             )
-            st.caption(
-                "Executa uma única tentativa e volta automaticamente para desativado."
+
+        st.markdown("---")
+        col_esquerda, col_aplicar, col_direita = st.columns([1, 1, 1])
+        with col_aplicar:
+            aplicar = st.form_submit_button(
+                "Aplicar",
+                type="primary",
+                use_container_width=True,
             )
 
     st.markdown("</div>", unsafe_allow_html=True)
