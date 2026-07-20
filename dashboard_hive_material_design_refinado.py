@@ -62,6 +62,8 @@ GITHUB_ARQ_LOG_DIA = f"logs/Log_{agora_sao_paulo().strftime('%Y_%m_%d')}.csv"
 # status_ecrv.json: retorno/estado confirmado pelo RPA para o dashboard reconhecer.
 GITHUB_ARQ_CONTROLE_ECRV = "comandos/controle_ecrv.json"
 GITHUB_ARQ_STATUS_ECRV = "status/status_ecrv.json"
+# Agendamento persistente da tentativa única de religamento automático.
+GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV = "comandos/religamento_auto_ecrv.json"
 
 # Quantidade de meses que serão exibidos na página de Histórico.
 # Exemplo: 6 = mês atual + 5 meses anteriores.
@@ -98,6 +100,7 @@ META_LOCAL = CACHE_DIR / "github_meta.json"
 ARQ_ALERTA_ECRV = CACHE_DIR / "alerta_ecrv_off.json"
 ARQ_LOCAL_CONTROLE_ECRV = CACHE_DIR / "controle_ecrv.json"
 ARQ_LOCAL_STATUS_ECRV = CACHE_DIR / "status_ecrv.json"
+ARQ_LOCAL_RELIGAMENTO_AUTO_ECRV = CACHE_DIR / "religamento_auto_ecrv.json"
 
 
 def caminho_github_log_data(data_ref=None) -> str:
@@ -113,6 +116,12 @@ def caminho_local_log_data(data_ref=None) -> Path:
 
 INTERVALO_VERIFICACAO_SEGUNDOS = 30
 TEMPO_MINIMO_OFF_MINUTOS = 15
+TEMPO_RELIGAMENTO_AUTOMATICO_MINUTOS = 15
+SERVICOS_RELIGAMENTO_AUTOMATICO = [
+    "Transferência 2",
+    "Transferência 3",
+    "0KM",
+]
 JANELA_STOP_MINUTOS = 420  # considera STOPs dos últimos 420 minutos
 JANELA_STATUS_RPA_MINUTOS = 60  # usa confirmação do RPA somente se for recente
 
@@ -1539,11 +1548,14 @@ def salvar_json_github(caminho_repo: str, payload: dict, mensagem_commit: str) -
         ).get("sha", "")
 
         # Atualiza cache local/metadados para evitar leitura defasada.
-        destino = (
-            ARQ_LOCAL_CONTROLE_ECRV
-            if caminho_repo == GITHUB_ARQ_CONTROLE_ECRV
-            else CACHE_DIR / caminho_repo.replace("/", "_")
-        )
+        if caminho_repo == GITHUB_ARQ_CONTROLE_ECRV:
+            destino = ARQ_LOCAL_CONTROLE_ECRV
+        elif caminho_repo == GITHUB_ARQ_STATUS_ECRV:
+            destino = ARQ_LOCAL_STATUS_ECRV
+        elif caminho_repo == GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV:
+            destino = ARQ_LOCAL_RELIGAMENTO_AUTO_ECRV
+        else:
+            destino = CACHE_DIR / caminho_repo.replace("/", "_")
 
         try:
             destino.write_text(conteudo_json, encoding="utf-8")
@@ -1562,6 +1574,241 @@ def salvar_json_github(caminho_repo: str, payload: dict, mensagem_commit: str) -
 
     except Exception as e:
         return False, f"Erro ao gravar comando no GitHub: {e}"
+
+
+def programar_religamento_automatico(agora: pd.Timestamp) -> bool:
+    """
+    Programa uma única tentativa de religamento dos robôs de Transferência 2,
+    Transferência 3 e 0KM para 15 minutos após a solicitação.
+
+    O estado fica persistido no GitHub para sobreviver aos reruns do Streamlit.
+    Nenhum alerta visual ou mensagem no Teams é enviado por esta rotina.
+    """
+    executar_em = agora + pd.Timedelta(minutes=TEMPO_RELIGAMENTO_AUTOMATICO_MINUTOS)
+
+    payload = {
+        "id": f"AUTO_{agora.strftime('%Y%m%d_%H%M%S')}",
+        "tipo": "RELIGAMENTO_AUTOMATICO",
+        "ativo": True,
+        "tentativa_unica": True,
+        "tentativa_realizada": False,
+        "programado_em": agora.strftime("%d/%m/%Y %H:%M:%S"),
+        "executar_em": executar_em.strftime("%d/%m/%Y %H:%M:%S"),
+        "servicos": list(SERVICOS_RELIGAMENTO_AUTOMATICO),
+        "resultado_tentativa": "AGUARDANDO",
+    }
+
+    ok, _ = salvar_json_github(
+        GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV,
+        payload,
+        f"Programa religamento automático {payload['id']}",
+    )
+    return ok
+
+
+def _atualizar_cache_json_salvo(caminho_repo: str, destino: Path, payload: dict, sha: str = ""):
+    """Atualiza o cache local após uma gravação direta e condicional no GitHub."""
+    try:
+        conteudo_json = json.dumps(payload, ensure_ascii=False, indent=2)
+        destino.write_text(conteudo_json, encoding="utf-8")
+
+        meta = carregar_meta_cache()
+        meta[caminho_repo] = {
+            "sha": sha,
+            "downloaded_at": agora_sao_paulo().strftime("%d/%m/%Y %H:%M:%S"),
+            "size": len(conteudo_json.encode("utf-8")),
+        }
+        salvar_meta_cache(meta)
+    except Exception:
+        pass
+
+
+def _desativar_religamento_automatico_antes_da_tentativa(
+    agendamento: dict,
+    agora: pd.Timestamp,
+) -> tuple[bool, dict]:
+    """
+    Consome o agendamento de forma condicional antes de enviar o comando de LIGAR.
+
+    A gravação usa o SHA atual do GitHub. Se duas sessões tentarem processar o
+    mesmo agendamento simultaneamente, apenas uma conseguirá gravar; assim, a
+    tentativa automática não será duplicada.
+    """
+    token = obter_token_github()
+    if not token:
+        return False, dict(agendamento or {})
+
+    api_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/contents/{GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV}"
+    )
+    headers = github_headers()
+
+    try:
+        resp_get = requests.get(
+            api_url,
+            headers=headers,
+            params={"ref": GITHUB_BRANCH},
+            timeout=30,
+        )
+        if resp_get.status_code != 200:
+            return False, dict(agendamento or {})
+
+        remoto = resp_get.json()
+        sha_atual = str(remoto.get("sha", "") or "")
+        conteudo_b64 = str(remoto.get("content", "") or "").replace("\n", "")
+        estado_remoto = json.loads(base64.b64decode(conteudo_b64).decode("utf-8"))
+
+        # Confirma que este ainda é o agendamento ativo que a sessão leu.
+        if str(estado_remoto.get("id", "")) != str(agendamento.get("id", "")):
+            return False, estado_remoto
+        if not bool(estado_remoto.get("ativo", False)):
+            return False, estado_remoto
+        if bool(estado_remoto.get("tentativa_realizada", False)):
+            return False, estado_remoto
+
+        estado = dict(estado_remoto)
+        estado["ativo"] = False
+        estado["tentativa_realizada"] = True
+        estado["tentativa_em"] = agora.strftime("%d/%m/%Y %H:%M:%S")
+        estado["resultado_tentativa"] = "EM_PROCESSAMENTO"
+
+        conteudo_json = json.dumps(estado, ensure_ascii=False, indent=2)
+        body = {
+            "message": f"Consome religamento automático {estado.get('id', '')}",
+            "content": base64.b64encode(conteudo_json.encode("utf-8")).decode("ascii"),
+            "branch": GITHUB_BRANCH,
+            "sha": sha_atual,
+        }
+
+        resp_put = requests.put(
+            api_url,
+            headers=headers,
+            json=body,
+            timeout=30,
+        )
+        if resp_put.status_code not in (200, 201):
+            return False, estado_remoto
+
+        sha_novo = ((resp_put.json().get("content", {}) or {}).get("sha", ""))
+        _atualizar_cache_json_salvo(
+            GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV,
+            ARQ_LOCAL_RELIGAMENTO_AUTO_ECRV,
+            estado,
+            sha_novo,
+        )
+        return True, estado
+
+    except Exception:
+        return False, dict(agendamento or {})
+
+
+def processar_religamento_automatico(
+    status_painel: dict,
+    status_ecrv: dict | None,
+    comando_ecrv: dict | None,
+    agendamento: dict | None,
+) -> dict:
+    """
+    Envia uma única vez um comando padrão de LIGAR para Transferência 2,
+    Transferência 3 e 0KM quando o prazo programado for atingido.
+
+    A rotina é silenciosa: não mostra st.success/st.warning/st.error e não chama
+    webhook do Teams. Se houver outro comando PENDENTE, aguarda sua conclusão
+    antes de consumir a tentativa, evitando sobrescrever o comando em andamento.
+    """
+    agendamento = agendamento if isinstance(agendamento, dict) else {}
+    comando_ecrv = comando_ecrv if isinstance(comando_ecrv, dict) else {}
+
+    if not bool(agendamento.get("ativo", False)):
+        return comando_ecrv
+
+    if bool(agendamento.get("tentativa_realizada", False)):
+        return comando_ecrv
+
+    executar_em = parse_data_hora_painel(agendamento.get("executar_em"))
+    if executar_em is None:
+        return comando_ecrv
+
+    agora = agora_sao_paulo()
+    if agora < executar_em:
+        return comando_ecrv
+
+    # Não substitui um comando manual que ainda esteja aguardando o RPA.
+    status_comando_atual = str(comando_ecrv.get("status", "") or "").strip().upper()
+    if status_comando_atual == "PENDENTE":
+        return comando_ecrv
+
+    # Consome a opção antes do envio: haverá no máximo uma tentativa real.
+    consumido, estado_agendamento = _desativar_religamento_automatico_antes_da_tentativa(
+        agendamento,
+        agora,
+    )
+    if not consumido:
+        return comando_ecrv
+
+    status_base = status_base_ecrv_para_controle(status_painel, status_ecrv)
+    servicos_desejados = {
+        servico: normalizar_status_on_off(status_base.get(servico), padrao="ON")
+        for servico in servicos_controle_robos()
+    }
+
+    for servico in SERVICOS_RELIGAMENTO_AUTOMATICO:
+        servicos_desejados[servico] = "ON"
+
+    # Envia as três ações mesmo que algum status já apareça ON. A finalidade é
+    # realizar uma tentativa efetiva de religamento de todos os robôs-alvo.
+    acoes = [
+        {
+            "servico": servico,
+            "acao": "LIGAR",
+            "status_anterior": normalizar_status_on_off(
+                status_base.get(servico),
+                padrao="OFF",
+            ),
+            "status_desejado": "ON",
+            "origem": "religamento_automatico",
+        }
+        for servico in SERVICOS_RELIGAMENTO_AUTOMATICO
+    ]
+
+    payload = {
+        "id": f"{agora.strftime('%Y%m%d_%H%M%S')}_AUTO",
+        "origem": "dashboard_religamento_automatico",
+        "tipo": "CONTROLE_ROBOS",
+        "status": "PENDENTE",
+        "solicitado_em": agora.strftime("%d/%m/%Y %H:%M:%S"),
+        "expira_em": (agora + pd.Timedelta(minutes=30)).strftime("%d/%m/%Y %H:%M:%S"),
+        "servicos_desejados": servicos_desejados,
+        "acoes": acoes,
+        "religamento_automatico": {
+            "agendamento_id": agendamento.get("id", ""),
+            "tentativa_unica": True,
+            "tentativa_realizada": True,
+        },
+        "observacao": (
+            "Tentativa única e silenciosa de religamento automático, executada "
+            "15 minutos após a programação no Controle de Robôs."
+        ),
+    }
+
+    ok_comando, msg_comando = salvar_json_github(
+        GITHUB_ARQ_CONTROLE_ECRV,
+        payload,
+        f"Religamento automático robôs {payload['id']}",
+    )
+
+    estado_agendamento["resultado_tentativa"] = (
+        "COMANDO_ENVIADO" if ok_comando else "FALHA_AO_ENVIAR_COMANDO"
+    )
+    estado_agendamento["detalhe_resultado"] = msg_comando
+    salvar_json_github(
+        GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV,
+        estado_agendamento,
+        f"Finaliza religamento automático {estado_agendamento.get('id', '')}",
+    )
+
+    return payload if ok_comando else comando_ecrv
 
 
 def status_card_robos(status_dict, robo_monitoramento_online=True) -> dict:
@@ -1770,6 +2017,9 @@ def inicializar_chaves_controle_robos(status_painel: dict, status_ecrv_base: dic
             normalizar_status_on_off(status_ecrv_base.get(servico), padrao="ON") == "ON"
         )
 
+    # Sempre inicia desativado. Após o usuário aplicar a opção, o agendamento
+    # fica persistido no GitHub e o botão volta para OFF no próximo formulário.
+    st.session_state["ecrv_religar_auto_15_min"] = False
     st.session_state["controle_robos_inicializado"] = True
 
 
@@ -1918,6 +2168,20 @@ def render_controle_robos(
                     key=f"ecrv_{servico}",
                 )
 
+            st.markdown("---")
+            st.markdown(
+                '<div class="controle-section-title" style="font-size:15px;">Religamento automático</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div class="controle-section-desc">Executa uma única tentativa de ligar Transferência 2, Transferência 3 e 0KM após 15 minutos. A opção volta automaticamente para desativada.</div>',
+                unsafe_allow_html=True,
+            )
+            religar_auto_15_min = toggle_fn(
+                "Religar os três robôs após 15 minutos",
+                key="ecrv_religar_auto_15_min",
+            )
+
         st.markdown("---")
         col_aplicar, col_sair = st.columns([1, 1])
         with col_aplicar:
@@ -1950,6 +2214,16 @@ def render_controle_robos(
     agora = agora_sao_paulo()
     agora_txt = agora.strftime("%d/%m/%Y %H:%M:%S")
 
+    # A programação é silenciosa e independente das demais alterações do formulário.
+    # Ao ser ativada novamente, substitui eventual agendamento anterior por um novo
+    # prazo de 15 minutos.
+    religamento_auto_programado = False
+    if religar_auto_15_min:
+        religamento_auto_programado = programar_religamento_automatico(agora)
+
+    # O toggle sempre volta desativado após o clique em Aplicar.
+    st.session_state["controle_robos_reinicializar"] = True
+
     # 1) Controle visual do Dashboard.
     st.session_state["controle_dash_status"] = {
         servico: ("ON" if ativo else "OFF")
@@ -1959,7 +2233,6 @@ def render_controle_robos(
     st.session_state["controle_dash_ate"] = agora + pd.Timedelta(
         minutes=TEMPO_MINIMO_OFF_MINUTOS
     )
-    st.session_state["controle_robos_reinicializar"] = True
 
     # 2) Comando real/sinal para o RPA via GitHub.
     servicos_desejados = {
@@ -1981,6 +2254,12 @@ def render_controle_robos(
             })
     
     if not acoes:
+        if religamento_auto_programado:
+            st.query_params["pagina"] = "Monitoramento atual"
+            st.query_params["tema"] = tema
+            rerun_streamlit()
+            return
+
         st.success(
             "Controle do Dashboard aplicado. Nenhum comando foi enviado ao RPA, "
             "pois não houve alteração no bloco e-CRV."
@@ -2047,6 +2326,10 @@ def render_controle_robos(
     )
 
     st.markdown("</div>", unsafe_allow_html=True)
+
+    if religamento_auto_programado:
+        rerun_streamlit()
+        return
 
 
 def baixar_github_se_houver_alteracao(caminho_repo: str, destino: Path, obrigatorio: bool = False):
@@ -5538,6 +5821,12 @@ comando_ecrv_atual, meta_comando_ecrv = carregar_json_github(
     obrigatorio=False,
 )
 
+religamento_auto_ecrv, meta_religamento_auto_ecrv = carregar_json_github(
+    GITHUB_ARQ_RELIGAMENTO_AUTO_ECRV,
+    ARQ_LOCAL_RELIGAMENTO_AUTO_ECRV,
+    obrigatorio=False,
+)
+
 # Reconhece status confirmado pelo RPA e, depois, aplica eventual controle
 # visual temporário feito no próprio Dashboard.
 robos, robo_monitoramento_online = aplicar_status_confirmado_rpa(
@@ -5558,6 +5847,16 @@ robos, robo_monitoramento_online = aplicar_controle_dashboard_manual(
 status_painel_robos = status_card_robos(
     robos,
     robo_monitoramento_online,
+)
+
+# Verifica silenciosamente se chegou o horário do religamento automático.
+# Quando aplicável, grava um comando CONTROLE_ROBOS comum, que será processado
+# pelo RPA exatamente pelo fluxo já existente.
+comando_ecrv_atual = processar_religamento_automatico(
+    status_painel_robos,
+    status_ecrv_rpa,
+    comando_ecrv_atual,
+    religamento_auto_ecrv,
 )
 
 enviar_alerta_robo_ecrv_off(
@@ -6337,6 +6636,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if pagina != "Ligar/Desligar":
+agendamento_auto_ativo = (
+    isinstance(religamento_auto_ecrv, dict)
+    and bool(religamento_auto_ecrv.get("ativo", False))
+    and not bool(religamento_auto_ecrv.get("tentativa_realizada", False))
+)
+
+if pagina != "Ligar/Desligar" or agendamento_auto_ativo:
     time.sleep(INTERVALO_VERIFICACAO_SEGUNDOS)
     st.rerun()
