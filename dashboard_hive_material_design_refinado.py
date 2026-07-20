@@ -1750,7 +1750,7 @@ def processar_religamento_automatico(
     status_base = status_base_ecrv_para_controle(status_painel, status_ecrv)
     servicos_desejados = {
         servico: normalizar_status_on_off(status_base.get(servico), padrao="ON")
-        for servico in servicos_controle_robos()
+        for servico in servicos_controle_ecrv()
     }
 
     for servico in SERVICOS_RELIGAMENTO_AUTOMATICO:
@@ -1822,11 +1822,21 @@ def status_card_robos(status_dict, robo_monitoramento_online=True) -> dict:
 
 
 def servicos_controle_robos() -> list[str]:
+    """Serviços disponíveis para controle visual no Dashboard."""
     return [
         "Transferência 2",
         "Transferência 3",
         "0KM",
         "Monitoramento e-CRV",
+    ]
+
+
+def servicos_controle_ecrv() -> list[str]:
+    """Robôs que podem receber comandos reais de ligar/desligar no e-CRV."""
+    return [
+        "Transferência 2",
+        "Transferência 3",
+        "0KM",
     ]
 
 
@@ -2013,9 +2023,14 @@ def inicializar_chaves_controle_robos(status_painel: dict, status_ecrv_base: dic
         st.session_state[f"dash_{servico}"] = (
             normalizar_status_on_off(status_painel.get(servico), padrao="ON") == "ON"
         )
+
+    for servico in servicos_controle_ecrv():
         st.session_state[f"ecrv_{servico}"] = (
             normalizar_status_on_off(status_ecrv_base.get(servico), padrao="ON") == "ON"
         )
+
+    # Remove eventual chave mantida por uma versão anterior do formulário.
+    st.session_state.pop("ecrv_Monitoramento e-CRV", None)
 
     # Sempre inicia desativado. Após o usuário aplicar a opção, o agendamento
     # fica persistido no GitHub e o botão volta para OFF no próximo formulário.
@@ -2162,40 +2177,27 @@ def render_controle_robos(
             )
 
             ecrv_valores = {}
-            for servico in servicos_controle_robos():
+            for servico in servicos_controle_ecrv():
                 ecrv_valores[servico] = toggle_fn(
                     servico,
                     key=f"ecrv_{servico}",
                 )
 
-            st.markdown("---")
-            st.markdown(
-                '<div class="controle-section-title" style="font-size:15px;">Religamento automático</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="controle-section-desc">Executa uma única tentativa de ligar Transferência 2, Transferência 3 e 0KM após 15 minutos. A opção volta automaticamente para desativada.</div>',
-                unsafe_allow_html=True,
-            )
-            religar_auto_15_min = toggle_fn(
-                "Religar os três robôs após 15 minutos",
-                key="ecrv_religar_auto_15_min",
-            )
-
         st.markdown("---")
-        col_aplicar, col_sair = st.columns([1, 1])
+        col_aplicar, col_religamento = st.columns([1, 1])
         with col_aplicar:
             aplicar = st.form_submit_button("Aplicar", type="primary", use_container_width=True)
-        with col_sair:
-            sair = st.form_submit_button("Bloquear acesso", use_container_width=True)
+
+        with col_religamento:
+            religar_auto_15_min = toggle_fn(
+                "Religar Transferência 2, Transferência 3 e 0KM após 15 minutos",
+                key="ecrv_religar_auto_15_min",
+            )
+            st.caption(
+                "Executa uma única tentativa e volta automaticamente para desativado."
+            )
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-    if sair:
-        st.session_state["controle_robos_autorizado"] = False
-        st.session_state["senha_controle_robos"] = ""
-        rerun_streamlit()
-        return
 
     if not aplicar:
         st.markdown(
