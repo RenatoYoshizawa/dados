@@ -5667,6 +5667,57 @@ fila_tdv = int(ultima.get("Fila TDV", 0))
 sucesso_tdv = int(ultima.get("Sucesso TDV", 0))
 incons_tdv = int(ultima.get("Inconsistencia TDV", 0))
 
+# =========================
+# ÚLTIMA ATUALIZAÇÃO DOS CARDS
+# =========================
+
+estado_cards_atual = (
+    fila_trf,
+    sucesso_trf,
+    incons_trf,
+    fila_0km,
+    sucesso_0km,
+    incons_0km,
+    fila_tdv,
+    sucesso_tdv,
+    incons_tdv,
+)
+
+# Primeira execução da sessão
+if "estado_cards_anterior" not in st.session_state:
+    st.session_state.estado_cards_anterior = estado_cards_atual
+
+    # Na primeira carga, usa o horário em que o Monitoramento.xlsx
+    # foi sincronizado pelo dashboard.
+    ultima_atualizacao_cards = "-"
+
+    if isinstance(meta_monitor, dict):
+        ultima_sync = meta_monitor.get("downloaded_at", "")
+
+        if ultima_sync:
+            try:
+                dt_sync = datetime.strptime(
+                    ultima_sync,
+                    "%d/%m/%Y %H:%M:%S"
+                )
+                ultima_atualizacao_cards = dt_sync.strftime("%H:%M")
+            except Exception:
+                ultima_atualizacao_cards = "-"
+
+    st.session_state.ultima_atualizacao_cards = ultima_atualizacao_cards
+
+# Se algum dos nove cards mudou
+elif estado_cards_atual != st.session_state.estado_cards_anterior:
+    st.session_state.estado_cards_anterior = estado_cards_atual
+    st.session_state.ultima_atualizacao_cards = (
+        agora_sao_paulo().strftime("%H:%M")
+    )
+
+ultima_atualizacao_cards = st.session_state.get(
+    "ultima_atualizacao_cards",
+    "-"
+)
+
 # Quantidade processada somente no último ciclo de 10 minutos
 sucesso_ciclo_trf = int(
     ultima.get(
@@ -5896,7 +5947,7 @@ if pagina == "Monitoramento atual":
         f"""
         <div class="hive-title">Monitoramento e-CRV</div>
         <div class="hive-subtitle">
-            Última coleta: <b>{hora_coleta}</b>
+            Última Atualização: <b>{ultima_atualizacao_cards}</b>
         </div>
         """,
         unsafe_allow_html=True,
