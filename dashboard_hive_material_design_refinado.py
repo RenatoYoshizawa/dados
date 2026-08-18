@@ -5641,7 +5641,11 @@ except Exception:
     robo_monitoramento_online = False
 
 fila_trf = int(ultima.get("Fila 2 e 3", 0))
-sucesso_trf = int(ultima.get("Sucesso 2 e 3", 0))
+sucesso_trf = max(
+    0,
+    int(ultima.get("Sucesso 2 e 3", 0))
+    - int(ultima.get("Sucesso TDV", 0))
+)
 incons_trf = int(ultima.get("Inconsistência 2 e 3", 0))
 automatizado = int(ultima.get("Automatizado", 0))
 
