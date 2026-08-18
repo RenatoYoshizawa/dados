@@ -4741,9 +4741,19 @@ def adicionar_quantidade_processos(df_base: pd.DataFrame) -> pd.DataFrame:
     df_base = df_base.copy()
 
     if "Sucesso 2 e 3" in df_base.columns:
-        df_base["Quantidade de processos - Transferências"] = (
+        sucesso_transferencias_sem_tdv = (
             pd.to_numeric(df_base["Sucesso 2 e 3"], errors="coerce")
             .fillna(0)
+        )
+    
+        if "Sucesso TDV" in df_base.columns:
+            sucesso_transferencias_sem_tdv = (
+                sucesso_transferencias_sem_tdv
+                - pd.to_numeric(df_base["Sucesso TDV"], errors="coerce").fillna(0)
+            )
+    
+        df_base["Quantidade de processos - Transferências"] = (
+            sucesso_transferencias_sem_tdv
             .diff()
             .fillna(0)
             .clip(lower=0)
