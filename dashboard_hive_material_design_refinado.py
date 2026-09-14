@@ -5620,6 +5620,10 @@ except Exception as e:
 
 # Evita horários duplicados após normalização do RPA.
 df = agrupar_monitoramento_por_horario(df)
+df["Fila 2 e 3"] = (
+    pd.to_numeric(df["Fila 2 e 3"], errors="coerce").fillna(0)
+    - pd.to_numeric(df["Fila TDV"], errors="coerce").fillna(0)
+).clip(lower=0).astype(int)
 df = adicionar_quantidade_processos(df)
 
 
