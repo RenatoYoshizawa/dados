@@ -5542,7 +5542,18 @@ def tabela_historico_criticas_minuto(df_hist: pd.DataFrame):
             & servico.str.contains("MINUTO", na=False)
         )
 
-    dfh = dfh[filtro].copy()
+    # Linhas antigas STOP QTD não identificam qual regra acionou o STOP.
+    # Somente as novas linhas explicitamente marcadas são exibidas.
+    col_inc = _coluna_existente(dfh, ["Inconsistência", "Inconsistencia"])
+    tipo_stop_qtd = (
+        dfh[col_tipo].apply(normalizar_txt).eq("STOP_QTD_ACIONADO")
+        if col_tipo else pd.Series(False, index=dfh.index)
+    )
+    legado_stop_qtd = (
+        dfh[col_inc].apply(normalizar_txt).str.startswith("STOP QTD -")
+        if col_inc else pd.Series(False, index=dfh.index)
+    )
+    dfh = dfh[(filtro & ~legado_stop_qtd) | tipo_stop_qtd].copy()
 
     if dfh.empty:
         return pd.DataFrame()
