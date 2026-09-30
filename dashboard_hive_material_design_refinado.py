@@ -1,3 +1,27 @@
+import streamlit as st
+
+# =========================
+# ATIVAÇÃO DO PAINEL
+# =========================
+# False: exibe somente o aviso e interrompe todas as funções deste painel.
+# Para reativar o funcionamento original, altere apenas para True.
+PAINEL_ATIVO = False
+
+st.set_page_config(
+    page_title="Monitoramento e-CRV",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+if not PAINEL_ATIVO:
+    st.title("Monitoramento e-CRV")
+    st.info(
+        "As funcionalidades deste painel estão desativadas. "
+        "O monitoramento está em fase de teste em outra plataforma."
+    )
+    st.stop()
+
+# Código original preservado para reativação.
 import os
 import time
 import base64
@@ -11,7 +35,6 @@ from pathlib import Path
 import pandas as pd
 import requests
 import plotly.graph_objects as go
-import streamlit as st
 import streamlit.components.v1 as components
 
 
@@ -173,11 +196,7 @@ TOLERANCIA_TENDENCIA_INCONS_PP = 0.5
 # STREAMLIT
 # =========================
 
-st.set_page_config(
-    page_title="Monitoramento e-CRV",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+
 
 
 # =========================
